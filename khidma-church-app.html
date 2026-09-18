@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>خِدمة — تطبيق مجتمع الكنيسة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<style>
+  :root{
+    --ink:#4A1220;
+    --ink-2:#651A2E;
+    --heading:#4A1220;
+    --gold:#C79A3D;
+    --gold-light:#E8C878;
+    --teal:#1F6F6B;
+    --teal-light:#3E938E;
+    --oxblood:#8A2D2D;
+    --parchment:#F6EFDF;
+    --parchment-2:#EDE0BF;
+    --paper:#FFFBF3;
+    --text:#2B211C;
+    --text-soft:#7A6C58;
+    --line:#E2D2A0;
+    --ok:#3C6E47;
+    --bad:#B23A3A;
+    --radius:14px;
+    --shadow:0 6px 20px rgba(74,18,32,0.12);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#2A0C15; --ink-2:#3A0F1C; --heading:#E8C878; --parchment:#1C1712; --parchment-2:#28211A;
+      --paper:#161210; --text:#EEE3CE; --text-soft:#B9AA8E; --line:#3E3324;
+      --teal:#3E938E; --shadow:0 6px 24px rgba(0,0,0,0.45);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#2A0C15; --ink-2:#3A0F1C; --heading:#E8C878; --parchment:#1C1712; --parchment-2:#28211A;
+    --paper:#161210; --text:#EEE3CE; --text-soft:#B9AA8E; --line:#3E3324;
+    --teal:#3E938E; --shadow:0 6px 24px rgba(0,0,0,0.45);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--parchment);
+    color:var(--text);
+    font-family:'Cairo',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  #root{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;background:var(--paper);position:relative;}
+  ::selection{background:var(--gold-light);}
+  a{color:inherit;}
+  button{font-family:inherit;}
+  input,textarea,select{font-family:inherit;}
+
+  /* ---------- top header ---------- */
+  .topbar{
+    background:linear-gradient(160deg,var(--ink),var(--ink-2));
+    color:var(--parchment);
+    padding:16px 16px 14px;
+    display:flex;align-items:center;gap:10px;
+    position:sticky;top:0;z-index:20;
+  }
+  .topbar .crest{width:32px;height:32px;flex:none;}
+  .topbar .titles{flex:1;min-width:0;}
+  .topbar h1{font-family:'Amiri',serif;font-size:19px;margin:0;font-weight:700;color:var(--gold-light);letter-spacing:.5px;}
+  .topbar .sub{font-size:11px;color:#D8B9A0;margin-top:1px;}
+  .topbar .userchip{font-size:11.5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);padding:6px 10px;border-radius:20px;display:flex;align-items:center;gap:6px;flex:none;}
+  .topbar .userchip .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);}
+  .logoutbtn{
+    flex:none;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+    color:var(--gold-light);width:34px;height:34px;border-radius:50%;font-size:14px;cursor:pointer;
+  }
+  .logoutbtn:active{transform:scale(.94);}
+
+  .emergency-banner{
+    background:linear-gradient(90deg,var(--oxblood),#9c3a3a);
+    color:#fff;font-size:12.5px;padding:8px 16px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+  }
+  .emergency-banner button{background:rgba(255,255,255,.18);border:none;color:#fff;padding:5px 10px;border-radius:8px;font-size:11.5px;cursor:pointer;}
+
+  /* ---------- content ---------- */
+  .content{flex:1;overflow-y:auto;padding:16px 16px 90px;}
+  .screen{animation:fadein .18s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  h2.section-title{font-family:'Amiri',serif;font-size:19px;margin:2px 0 12px;color:var(--heading);font-weight:700;}
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 15px;
+    margin-bottom:12px;
+    box-shadow:var(--shadow);
+  }
+  .card.tight{padding:10px 13px;}
+  .muted{color:var(--text-soft);font-size:12.5px;}
+  .label{font-size:12.5px;color:var(--text-soft);margin-bottom:5px;display:block;}
+  .field{margin-bottom:12px;}
+  .field input, .field textarea, .field select{
+    width:100%;padding:11px 12px;border-radius:10px;border:1.5px solid var(--line);
+    background:var(--paper);color:var(--text);font-size:14.5px;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus{outline:2px solid var(--gold);border-color:var(--gold);}
+  .field textarea{resize:vertical;min-height:70px;}
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:12px 18px;border-radius:999px;border:1.5px solid transparent;font-size:14.5px;font-weight:700;
+    cursor:pointer;transition:transform .08s ease, box-shadow .12s ease, opacity .12s ease;width:100%;
+    letter-spacing:.2px;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:linear-gradient(180deg,var(--ink-2),var(--ink));color:var(--gold-light);box-shadow:0 3px 10px rgba(74,18,32,.35), inset 0 1px 0 rgba(255,255,255,.08);}
+  .btn-gold{background:linear-gradient(180deg,var(--gold-light),var(--gold));color:#3A2A08;box-shadow:0 3px 10px rgba(199,154,61,.35), inset 0 1px 0 rgba(255,255,255,.35);border-color:rgba(255,255,255,.25);}
+  .btn-outline{background:var(--paper);border:1.5px solid var(--gold);color:var(--text);}
+  .btn-teal{background:linear-gradient(180deg,var(--teal-light),var(--teal));color:#fff;box-shadow:0 3px 10px rgba(31,111,107,.3);}
+  .btn-danger{background:linear-gradient(180deg,#C24C4C,var(--bad));color:#fff;box-shadow:0 3px 10px rgba(178,58,58,.3);}
+  .btn-ghost{background:transparent;color:var(--teal);text-decoration:none;padding:6px 4px;width:auto;font-weight:700;border:none;border-radius:8px;}
+  .btn-ghost:active{background:rgba(31,111,107,.1);}
+  .btn-sm{padding:8px 14px;font-size:12.5px;width:auto;}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;}
+
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+  .badge-gold{background:rgba(199,154,61,.18);color:#8a6520;}
+  .badge-ok{background:rgba(60,110,71,.14);color:var(--ok);}
+  .badge-bad{background:rgba(178,58,58,.14);color:var(--bad);}
+  .badge-ink{background:rgba(122,108,88,.16);color:var(--text);}
+  .badge-teal{background:rgba(31,111,107,.14);color:var(--teal);}
+
+  .divider{height:1px;background:var(--line);margin:12px 0;}
+  .empty{text-align:center;padding:40px 10px;color:var(--text-soft);}
+  .empty .big{font-size:34px;margin-bottom:8px;}
+
+  /* ---------- bottom nav ---------- */
+  .tabbar{
+    position:sticky;bottom:0;left:0;right:0;
+    background:var(--ink);
+    display:flex;
+    border-top:1px solid rgba(255,255,255,.08);
+    padding:5px 2px calc(5px + env(safe-area-inset-bottom));
+    z-index:20;
+    max-width:520px;margin:0 auto;width:100%;
+  }
+  .tab{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:6px 1px;background:none;border:none;color:#C9A08C;cursor:pointer;font-size:9.8px;font-family:inherit;font-weight:700;
+  }
+  .tab .ic{font-size:17px;line-height:1;}
+  .tab.active{color:var(--gold-light);}
+
+  /* ---------- auth ---------- */
+  .auth-wrap{padding:36px 22px 30px;display:flex;flex-direction:column;min-height:100%;justify-content:center;}
+  .auth-crest{width:64px;height:64px;margin:0 auto 14px;}
+  .auth-title{font-family:'Amiri',serif;font-size:28px;text-align:center;color:var(--heading);font-weight:700;margin:0;}
+  .auth-sub{text-align:center;color:var(--text-soft);font-size:13px;margin:6px 0 26px;}
+  .authtabs{display:flex;background:var(--parchment-2);border-radius:12px;padding:4px;margin-bottom:20px;}
+  .authtabs button{flex:1;padding:9px;border:none;background:none;border-radius:9px;font-family:inherit;font-weight:700;font-size:13.5px;color:var(--text-soft);cursor:pointer;}
+  .authtabs button.active{background:var(--ink);color:var(--gold-light);}
+
+  /* ---------- attendance grid ---------- */
+  .member-row{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .member-row:last-child{border-bottom:none;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--gold-light);color:#3a2c05;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;font-size:13px;}
+  .m-name{flex:1;font-size:13.5px;font-weight:600;min-width:0;}
+  .m-name small{display:block;font-weight:400;color:var(--text-soft);font-size:10.5px;}
+  .check{
+    width:36px;height:36px;border-radius:10px;border:1.6px solid var(--line);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;flex:none;background:var(--paper);
+    transition:.12s;
+  }
+  .check.on{background:var(--ok);border-color:var(--ok);color:#fff;}
+  .check[disabled]{opacity:.5;cursor:default;}
+
+  /* ---------- chat ---------- */
+  .chat-list-item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:9px;cursor:pointer;background:var(--paper);}
+  .chat-thread{display:flex;flex-direction:column;height:calc(100vh - 260px);min-height:320px;}
+  .thread-msgs{flex:1;overflow-y:auto;padding:6px 2px;display:flex;flex-direction:column;gap:8px;}
+  .bubble{max-width:78%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.5;}
+  .bubble.me{align-self:flex-start;background:var(--ink);color:var(--parchment);border-bottom-left-radius:4px;}
+  .bubble.them{align-self:flex-end;background:var(--parchment-2);border-bottom-right-radius:4px;}
+  .bubble .t{font-size:10px;opacity:.6;margin-top:3px;display:block;}
+  .thread-input{display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--line);margin-top:8px;}
+  .thread-input input{flex:1;}
+  .thread-input button{width:auto;padding:11px 18px;}
+
+  .toast{
+    position:fixed;bottom:86px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:var(--gold-light);padding:10px 18px;border-radius:30px;
+    font-size:13px;font-weight:700;box-shadow:var(--shadow);z-index:50;max-width:90%;text-align:center;
+  }
+  .segmented{display:flex;background:var(--parchment-2);border-radius:10px;padding:3px;margin-bottom:14px;overflow-x:auto;}
+  .segmented button{flex:none;padding:8px 14px;border:none;background:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:12.5px;color:var(--text-soft);cursor:pointer;white-space:nowrap;}
+  .segmented button.active{background:var(--ink);color:var(--gold-light);}
+  ul.plain{list-style:none;margin:0;padding:0;}
+
+  .checklist{display:flex;flex-direction:column;gap:8px;}
+  .checklist label{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--paper);}
+  .checklist input{width:16px;height:16px;}
+
+  .points-pill{display:flex;align-items:center;gap:6px;background:var(--parchment-2);border-radius:20px;padding:4px 4px 4px 12px;}
+  .points-pill button{width:28px;height:28px;border-radius:50%;border:none;background:var(--ink);color:var(--gold-light);font-size:15px;font-weight:800;cursor:pointer;flex:none;}
+  .points-pill .val{font-weight:800;font-size:14px;min-width:34px;text-align:center;}
+
+  /* ---------- scanner modal ---------- */
+  .scan-overlay{position:fixed;inset:0;background:#000;z-index:100;display:flex;flex-direction:column;max-width:520px;margin:0 auto;}
+  .scan-overlay video{flex:1;width:100%;object-fit:cover;}
+  .scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border:3px solid var(--gold);border-radius:18px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);}
+  .scan-top{position:absolute;top:0;left:0;right:0;padding:16px;display:flex;justify-content:space-between;align-items:center;color:#fff;z-index:2;}
+  .scan-top button{background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;}
+  .scan-status{position:absolute;bottom:24px;left:16px;right:16px;text-align:center;color:#fff;font-size:13.5px;background:rgba(0,0,0,.5);padding:10px;border-radius:12px;z-index:2;}
+
+  .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:120;display:flex;align-items:center;justify-content:center;padding:24px;max-width:520px;margin:0 auto;}
+  .confirm-box{background:var(--paper);border-radius:16px;padding:20px;width:100%;max-width:340px;box-shadow:var(--shadow);}
+  .confirm-box p{margin:0 0 16px;font-size:14.5px;line-height:1.7;color:var(--text);text-align:center;}
+  .confirm-box .row{gap:8px;}
+  #qrHolder svg{width:100%;height:100%;display:block;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* =======================================================================
+   خِدمة — Church Community App (interactive click-through prototype)
+   Client-only demo: persistence via localStorage on this device only.
+   ======================================================================= */
+
+const STORAGE_KEY = 'khidma_church_app_v2';
+
+/* ---- Supabase sync (shared database) ---- */
+const SUPABASE_URL = 'https://owpkjnbnyfldnmubfzsy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FeyMhWVyMkFYhOzXllF9ig_08zVqWC8';
+const SUPA_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json' };
+let lastSyncedAt = null;   // updated_at of the last remote state we applied
+let syncing = false;       // true while a push is in flight, to avoid overlapping writes
+
+async function fetchRemoteState(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`, { headers: SUPA_HEADERS });
+    if(!res.ok) return null;
+    const rows = await res.json();
+    if(rows && rows[0]) return rows[0];
+    return null;
+  }catch(e){ console.warn('Supabase fetch failed (offline or blocked):', e); return null; }
+}
+async function pushRemoteState(s){
+  if(syncing) return;
+  syncing = true;
+  try{
+    const nowIso = new Date().toISOString();
+    await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1`, {
+      method:'PATCH', headers: SUPA_HEADERS,
+      body: JSON.stringify({ data: s, updated_at: nowIso })
+    });
+    lastSyncedAt = nowIso;
+  }catch(e){ console.warn('Supabase push failed (offline or blocked):', e); }
+  finally{ syncing = false; }
+}
+// Poll for changes made by other people/devices, and merge them in.
+async function pollRemoteState(){
+  const row = await fetchRemoteState();
+  if(!row || !row.data || !Array.isArray(row.data.users) || !row.data.users.length) return;
+  if(row.updated_at !== lastSyncedAt){
+    lastSyncedAt = row.updated_at;
+    state = row.data;
+    saveState(state); // keep local cache warm too
+    render();
+  }
+}
+// Run once at startup: if the shared table already has data, adopt it (so every
+// device converges on the same data instead of each keeping its own demo copy).
+// If the table is empty (very first run ever), seed it with this device's state.
+async function initialSync(){
+  const row = await fetchRemoteState();
+  if(row && row.data && Array.isArray(row.data.users) && row.data.users.length){
+    lastSyncedAt = row.updated_at;
+    state = row.data;
+    saveState(state);
+    render();
+  } else {
+    try{
+      const nowIso = new Date().toISOString();
+      await fetch(`${SUPABASE_URL}/rest/v1/app_state`, {
+        method:'POST', headers: {...SUPA_HEADERS, 'Prefer':'resolution=merge-duplicates'},
+        body: JSON.stringify({ id:1, data: state, updated_at: nowIso })
+      });
+      lastSyncedAt = nowIso;
+    }catch(e){ console.warn('Initial Supabase seed failed:', e); }
+  }
+}
+
+function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+function nowISO(){ return new Date().toISOString(); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function seedState(){
+  const c1 = uid('cls'), c2 = uid('cls'), c3 = uid('cls');
+  const uAdmin = uid('u'), uKh1 = uid('u'), uKh2 = uid('u'),
+        uMem1 = uid('u'), uMem2 = uid('u'), uMem3 = uid('u'), uPending = uid('u');
+  const a1 = uid('asg');
+  return {
+    session: { userId: null },
+    users: [
+      { id:uAdmin, name:'مينا جرجس', email:'admin@demo.com', mobile:'01000000001', address:'شارع الكنيسة، القاهرة',
+        password:'admin123', role:'senior_admin', status:'approved', classroomId:null, points:0, createdAt: nowISO() },
+      { id:uKh1, name:'مريم صموئيل', email:'khadim@demo.com', mobile:'01000000002', address:'شارع النصر، الجيزة',
+        password:'123456', role:'khadim', status:'approved', classroomId:null, points:0, createdAt: nowISO() },
+      { id:uKh2, name:'أندرو فوزي', email:'khadim2@demo.com', mobile:'01000000003', address:'مدينة نصر',
+        password:'123456', role:'khadim', status:'approved', classroomId:null, points:0, createdAt: nowISO() },
+      { id:uMem1, name:'بيشوي عادل', email:'member@demo.com', mobile:'01000000004', address:'المعادي',
+        password:'123456', role:'makhdoum', status:'approved', classroomId:c1, points:15, createdAt: nowISO() },
+      { id:uMem2, name:'مارينا سامح', email:'member2@demo.com', mobile:'01000000005', address:'حلوان',
+        password:'123456', role:'makhdoum', status:'approved', classroomId:c1, points:5, createdAt: nowISO() },
+      { id:uMem3, name:'كيرلس ناجي', email:'member3@demo.com', mobile:'01000000006', address:'شبرا',
+        password:'123456', role:'makhdoum', status:'approved', classroomId:c1, points:0, createdAt: nowISO() },
+      { id:uPending, name:'جرجس فايز', email:'pending@demo.com', mobile:'01000000007', address:'عين شمس',
+        password:'123456', role:'makhdoum', status:'pending', classroomId:null, points:0, createdAt: nowISO() },
+    ],
+    classrooms: [
+      { id:c1, name:'فصل يوسف الرسول', servantIds:[uKh1, uKh2] },
+      { id:c2, name:'فصل مارمرقس', servantIds:[uKh2] },
+      { id:c3, name:'فصل الأنبا أنطونيوس', servantIds:[] },
+    ],
+    attendance: [
+      { id:uid('att'), memberId:uMem1, classroomId:c1, date: todayStr(), quddas:true, ijtimaa:false, markedBy:uKh1 },
+    ],
+    assignments: [
+      { id:a1, title:'حفظ مزمور ١٥٠', description:'حفظ المزمور كاملًا وتسميعه للخادم.', points:10, classroomId:c1, createdBy:uKh1, createdAt: nowISO(), completions:{} },
+    ],
+    news: [
+      { id:uid('news'), title:'اجتماع الخدام الشهري', content:'يُرجى حضور جميع الخدام اجتماع الخدمة يوم الجمعة القادم بعد صلاة العشية مباشرة.', authorName:'مينا جرجس', authorId:uAdmin, createdAt: nowISO() },
+    ],
+    chats: [
+      { id:uid('chat'), memberId:uMem2, memberName:'مارينا سامح', status:'unclaimed', claimedById:null, claimedByName:null,
+        messages:[ {sender:'member', senderName:'مارينا سامح', text:'سلام أبونا، عايزة أستأذن غياب الأحد الجاي بسبب سفر.', time: nowISO()} ],
+        createdAt: nowISO() },
+    ],
+    settings: { pointsQuddas:5, pointsIjtimaa:5 },
+    pointsLog: [],
+    emergency: { active:false, byUserId:null, originalRole:null, grantedAt:null, log:[] },
+    auditLog: [
+      { id:uid('log'), time: nowISO(), actor:'النظام', action:'تم إنشاء التطبيق وتحميل البيانات التجريبية.' },
+    ],
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      if(!s.assignments) s.assignments = [];
+      if(!s.settings) s.settings = { pointsQuddas:5, pointsIjtimaa:5 };
+      if(!s.pointsLog) s.pointsLog = [];
+      s.classrooms.forEach(c=>{ if(!c.servantIds) c.servantIds = c.servantId ? [c.servantId] : []; });
+      s.users.forEach(u=>{ if(typeof u.points !== 'number') u.points = 0; });
+      return s;
+    }
+  }catch(e){ /* fall through to seed */ }
+  const s = seedState();
+  saveState(s);
+  return s;
+}
+function saveState(s){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }catch(e){ console.warn('storage failed', e); }
+}
+
+let state = loadState();
+let ui = { screen:'login', authTab:'login', activeTab:'news', openChatId:null,
+           adminAttClassroom:null, ministrySub:'attendance', adminSub:'pending', toast:null, scanning:false, confirm:null };
+
+function persist(){ saveState(state); pushRemoteState(state); }
+function log(actor, action){
+  state.auditLog.unshift({ id:uid('log'), time: nowISO(), actor, action });
+  state.auditLog = state.auditLog.slice(0,80);
+}
+function showToast(msg){
+  ui.toast = msg;
+  render();
+  setTimeout(()=>{ ui.toast=null; render(); }, 2200);
+}
+function askConfirm(message, onYes){
+  ui.confirm = { message, onYes };
+  render();
+}
+function awardPoints(member, delta, reason, byName){
+  member.points = Math.max(0, (member.points||0) + delta);
+  state.pointsLog.unshift({ id:uid('pl'), time: nowISO(), memberId:member.id, memberName:member.name, delta, reason, by:byName });
+  state.pointsLog = state.pointsLog.slice(0,150);
+}
+
+/* ---------- emergency access ---------- */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function currentHourBucket(){ return Math.floor(Date.now() / 3600000); }
+function getEmergencyCredential(){
+  const bucket = currentHourBucket();
+  const rand = mulberry32(bucket * 2654435761 % 2147483647);
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = ''; for(let i=0;i<6;i++) code += chars[Math.floor(rand()*chars.length)];
+  let pass = ''; for(let i=0;i<6;i++) pass += Math.floor(rand()*10);
+  const nextRefresh = (bucket+1) * 3600000;
+  return { code, pass, nextRefresh };
+}
+function checkEmergencyExpiry(){
+  if(state.emergency.active){
+    const grantedAt = new Date(state.emergency.grantedAt).getTime();
+    if(Date.now() - grantedAt > 24*3600*1000) revertEmergency('انتهت صلاحية الوصول الطارئ تلقائيًا بعد ٢٤ ساعة.');
+  }
+}
+function revertEmergency(reason){
+  const u = state.users.find(x=>x.id===state.emergency.byUserId);
+  if(u && state.emergency.originalRole){ u.role = state.emergency.originalRole; }
+  log('النظام', reason || 'تم إنهاء وضع الوصول الطارئ.');
+  state.emergency = { active:false, byUserId:null, originalRole:null, grantedAt:null, log: state.emergency.log };
+  persist();
+}
+
+/* ---------- helpers ---------- */
+function currentUser(){ return state.users.find(u=>u.id===state.session.userId) || null; }
+function classroomOf(id){ return state.classrooms.find(c=>c.id===id); }
+function membersOfClassroom(cid){ return state.users.filter(u=>u.role==='makhdoum' && u.status==='approved' && u.classroomId===cid); }
+function isAdminish(u){ return u && (u.role==='khadim' || u.role==='senior_admin'); }
+function myClassrooms(u){ return u.role==='senior_admin' ? state.classrooms : state.classrooms.filter(c=>c.servantIds.includes(u.id)); }
+function initials(name){ return (name||'?').trim().split(' ')[0].slice(0,1); }
+function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString('ar-EG',{day:'numeric',month:'short'}); }
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------- Self-contained QR code encoder (Model 2, byte mode, EC level L) ----------
+   No external library — built directly from the ISO/IEC 18004 spec and round-trip
+   verified offline before use, so it doesn't depend on any CDN loading correctly. */
+const QR_GF_EXP = new Array(512), QR_GF_LOG = new Array(256);
+(function initQRGF(){
+  let x = 1;
+  for(let i=0;i<255;i++){ QR_GF_EXP[i]=x; QR_GF_LOG[x]=i; x<<=1; if(x&0x100) x^=0x11D; }
+  for(let i=255;i<512;i++) QR_GF_EXP[i]=QR_GF_EXP[i-255];
+})();
+function qrGfMul(a,b){ if(a===0||b===0) return 0; return QR_GF_EXP[QR_GF_LOG[a]+QR_GF_LOG[b]]; }
+function qrRsGenPoly(degree){
+  let poly=[1];
+  for(let i=0;i<degree;i++){
+    const root = QR_GF_EXP[i];
+    const res = new Array(poly.length+1).fill(0);
+    for(let j=0;j<poly.length;j++){ res[j]^=poly[j]; res[j+1]^=qrGfMul(poly[j],root); }
+    poly = res;
+  }
+  return poly;
+}
+function qrRsEncode(dataCw, ecCount){
+  const gen = qrRsGenPoly(ecCount);
+  const res = dataCw.concat(new Array(ecCount).fill(0));
+  for(let i=0;i<dataCw.length;i++){
+    const coef = res[i];
+    if(coef!==0){ for(let j=0;j<gen.length;j++){ res[i+j]^=qrGfMul(gen[j],coef); } }
+  }
+  return res.slice(dataCw.length);
+}
+const QR_VERSION_INFO = {
+  1:{size:21,dataCodewords:19,ecCodewords:7}, 2:{size:25,dataCodewords:34,ecCodewords:10},
+  3:{size:29,dataCodewords:55,ecCodewords:15}, 4:{size:33,dataCodewords:80,ecCodewords:20},
+};
+function qrChooseVersion(byteLen){
+  for(const v of [1,2,3,4]){
+    const info = QR_VERSION_INFO[v];
+    const countBits = v<=9?8:16;
+    if(4+countBits+byteLen*8 <= info.dataCodewords*8) return v;
+  }
+  return 4; // will overflow/truncate for extremely long text, not expected here
+}
+function qrBuildDataBits(bytes, version){
+  const countBits = version<=9?8:16;
+  let bits = '0100' + bytes.length.toString(2).padStart(countBits,'0');
+  for(const b of bytes) bits += b.toString(2).padStart(8,'0');
+  const capacityBits = QR_VERSION_INFO[version].dataCodewords*8;
+  bits += '0'.repeat(Math.max(0, Math.min(4, capacityBits-bits.length)));
+  while(bits.length % 8 !== 0) bits += '0';
+  const padBytes=[0xEC,0x11]; let pi=0;
+  while(bits.length < capacityBits){ bits += padBytes[pi%2].toString(2).padStart(8,'0'); pi++; }
+  const cws=[]; for(let i=0;i<bits.length;i+=8) cws.push(parseInt(bits.slice(i,i+8),2));
+  return cws;
+}
+function qrIsFunctionModule(size, r, c, version){
+  if(r<=7 && c<=7) return true;
+  if(r<=7 && c>=size-8) return true;
+  if(r>=size-8 && c<=7) return true;
+  if(r===6 || c===6) return true;
+  if(r===size-8 && c===8) return true;
+  if((r===8 && (c<9 || c>=size-8)) || (c===8 && (r<9 || r>=size-7))) return true;
+  if(version>=2){ const pos=size-7; if(Math.abs(r-pos)<=2 && Math.abs(c-pos)<=2) return true; }
+  return false;
+}
+function qrPlaceFinder(matrix, r0, c0){
+  for(let r=-1;r<=7;r++) for(let c=-1;c<=7;c++){
+    const rr=r0+r, cc=c0+c;
+    if(rr<0||cc<0||rr>=matrix.length||cc>=matrix.length) continue;
+    let dark=false;
+    if(r>=0&&r<=6&&c>=0&&c<=6){ if(r===0||r===6||c===0||c===6) dark=true; else if(r>=2&&r<=4&&c>=2&&c<=4) dark=true; }
+    matrix[rr][cc]=dark?1:0;
+  }
+}
+function qrPlaceAlignment(matrix, r0, c0){
+  for(let r=-2;r<=2;r++) for(let c=-2;c<=2;c++){
+    matrix[r0+r][c0+c] = (Math.max(Math.abs(r),Math.abs(c))!==1)?1:0;
+  }
+}
+function qrBuildMatrix(version, dataCodewords, ecCodewords){
+  const size = QR_VERSION_INFO[version].size;
+  const matrix = Array.from({length:size},()=>new Array(size).fill(null));
+  qrPlaceFinder(matrix,0,0); qrPlaceFinder(matrix,0,size-7); qrPlaceFinder(matrix,size-7,0);
+  for(let i=8;i<size-8;i++){ matrix[6][i]=(i%2===0)?1:0; matrix[i][6]=(i%2===0)?1:0; }
+  matrix[size-8][8]=1;
+  if(version>=2) qrPlaceAlignment(matrix, size-7, size-7);
+  for(let i=0;i<9;i++){ if(matrix[8][i]===null) matrix[8][i]=0; if(matrix[i][8]===null) matrix[i][8]=0; }
+  for(let i=0;i<8;i++){ if(matrix[8][size-1-i]===null) matrix[8][size-1-i]=0; if(matrix[size-1-i][8]===null) matrix[size-1-i][8]=0; }
+
+  const bitStream=[];
+  for(const cw of dataCodewords.concat(ecCodewords)){ for(let b=7;b>=0;b--) bitStream.push((cw>>b)&1); }
+  let bitIndex=0, col=size-1, dir=-1;
+  while(col>0){
+    if(col===6) col--;
+    for(let i=0;i<size;i++){
+      const row = dir===-1 ? size-1-i : i;
+      for(const c of [col,col-1]){
+        if(qrIsFunctionModule(size,row,c,version)) continue;
+        if(matrix[row][c]!==null) continue;
+        const bit = bitIndex<bitStream.length ? bitStream[bitIndex] : 0; bitIndex++;
+        matrix[row][c] = ((row+c)%2===0) ? (bit^1) : bit;
+      }
+    }
+    dir*=-1; col-=2;
+  }
+  // format info: EC level L + mask pattern 0
+  const fmtVal = parseInt('01000',2); // 2 bits EC-level field + 3 bits mask
+  let g2 = fmtVal<<10;
+  const genPoly = 0b10100110111;
+  for(let i=14;i>=10;i--){ if((g2>>i)&1) g2 ^= genPoly<<(i-10); }
+  let fmtBits15 = ((fmtVal<<10)|g2) ^ 0b101010000010010;
+  fmtBits15 &= 0x7FFF;
+  const fmtArr=[]; for(let i=14;i>=0;i--) fmtArr.push((fmtBits15>>i)&1);
+  const posA=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  for(let i=0;i<15;i++){ matrix[posA[i][0]][posA[i][1]] = fmtArr[i]; }
+  for(let i=0;i<8;i++){ matrix[8][size-1-i] = fmtArr[i]; }
+  for(let i=8;i<15;i++){ matrix[size-15+i][8] = fmtArr[i]; }
+  return matrix;
+}
+function generateQRSvg(text){
+  const bytes = Array.from(new TextEncoder().encode(text));
+  const version = qrChooseVersion(bytes.length);
+  const info = QR_VERSION_INFO[version];
+  const dataCodewords = qrBuildDataBits(bytes, version);
+  const ecCodewords = qrRsEncode(dataCodewords, info.ecCodewords);
+  const matrix = qrBuildMatrix(version, dataCodewords, ecCodewords);
+  const cell=6, margin=14, dim = info.size*cell + margin*2;
+  let rects='';
+  for(let r=0;r<info.size;r++) for(let c=0;c<info.size;c++) if(matrix[r][c]) rects += `<rect x="${c*cell+margin}" y="${r*cell+margin}" width="${cell}" height="${cell}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dim} ${dim}"><rect width="${dim}" height="${dim}" fill="#fff"/><g fill="#4A1220">${rects}</g></svg>`;
+}
+
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+function render(){
+  checkEmergencyExpiry();
+  const root = document.getElementById('root');
+  const u = currentUser();
+
+  if(!u){ root.innerHTML = renderAuth(); bindAuthEvents(); return; }
+  if(u.status === 'banned'){ root.innerHTML = renderBanned(u); bindPendingEvents(); return; }
+  if(u.status === 'pending'){ root.innerHTML = renderPending(u); bindPendingEvents(); return; }
+  if(u.status === 'rejected'){ root.innerHTML = renderRejected(u); bindPendingEvents(); return; }
+
+  root.innerHTML = renderApp(u);
+  bindAppEvents(u);
+  if(ui.scanning) startScanner();
+}
+
+/* ---------------- AUTH ---------------- */
+function crestSVG(size){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="32" r="30" fill="none" stroke="#C79A3D" stroke-width="2"/>
+    <path d="M32 10 V54 M20 20 H44 M24 44 H40" stroke="#C79A3D" stroke-width="3" stroke-linecap="round"/>
+    <path d="M32 10 C 26 14, 26 18, 32 20 C 38 18, 38 14, 32 10 Z" fill="#C79A3D"/>
+  </svg>`;
+}
+
+function renderAuth(){
+  const tab = ui.authTab;
+  return `
+  <div class="auth-wrap">
+    <div class="auth-crest">${crestSVG(64)}</div>
+    <h1 class="auth-title">خِدمة</h1>
+    <p class="auth-sub">تطبيق مجتمع الكنيسة — خدام ومخدومين</p>
+    <div class="authtabs">
+      <button data-authtab="login" class="${tab==='login'?'active':''}">تسجيل الدخول</button>
+      <button data-authtab="signup" class="${tab==='signup'?'active':''}">حساب جديد</button>
+    </div>
+    ${tab==='login' ? renderLoginForm() : renderSignupForm()}
+  </div>`;
+}
+function renderLoginForm(){
+  return `
+  <form id="loginForm">
+    <div class="field"><span class="label">البريد الإلكتروني</span><input type="email" id="li_email" required placeholder="example@email.com"></div>
+    <div class="field"><span class="label">كلمة المرور</span><input type="password" id="li_pass" required placeholder="••••••••"></div>
+    <div id="loginError" class="muted" style="color:var(--bad);display:none;margin-bottom:10px;"></div>
+    <button type="submit" class="btn btn-primary">دخول</button>
+  </form>
+  <div style="text-align:center;margin-top:14px;">
+    <button class="btn-ghost" id="toggleEmergency" type="button">دخول بكود الطوارئ</button>
+  </div>
+  <div id="emergencyBox" style="display:none;margin-top:10px;">
+    <div class="card tight">
+      <div class="field"><span class="label">البريد الإلكتروني (لخادم موجود)</span><input type="email" id="em_email" placeholder="example@email.com"></div>
+      <div class="row">
+        <div class="field"><span class="label">كود الطوارئ</span><input type="text" id="em_code" placeholder="XXXXXX"></div>
+        <div class="field"><span class="label">كلمة مرور الطوارئ</span><input type="text" id="em_pass" placeholder="000000"></div>
+      </div>
+      <button class="btn btn-danger" id="emergencyBtn" type="button">تفعيل الوصول الطارئ (٢٤ ساعة)</button>
+      <p class="muted" style="margin-top:8px;">يمنحك صلاحيات الإداري العام مؤقتًا، ويعود حسابك تلقائيًا لدوره الأصلي بعد ٢٤ ساعة.</p>
+    </div>
+  </div>`;
+}
+function renderSignupForm(){
+  return `
+  <form id="signupForm">
+    <div class="field"><span class="label">الاسم بالكامل</span><input type="text" id="su_name" required></div>
+    <div class="field"><span class="label">البريد الإلكتروني</span><input type="email" id="su_email" required></div>
+    <div class="field"><span class="label">رقم الموبايل</span><input type="tel" id="su_mobile" required></div>
+    <div class="field"><span class="label">العنوان</span><input type="text" id="su_address" required></div>
+    <div class="field"><span class="label">كلمة المرور</span><input type="password" id="su_pass" required minlength="4"></div>
+    <div id="signupError" class="muted" style="color:var(--bad);display:none;margin-bottom:10px;"></div>
+    <button type="submit" class="btn btn-gold">إرسال طلب الانضمام</button>
+    <p class="muted" style="margin-top:10px;text-align:center;">سيتم تسجيلك كـ"مخدوم"، وسيحتاج طلبك موافقة أحد الخدام أو الإداريين قبل الدخول.</p>
+  </form>`;
+}
+function bindAuthEvents(){
+  document.querySelectorAll('[data-authtab]').forEach(b=>{ b.onclick = ()=>{ ui.authTab = b.dataset.authtab; render(); }; });
+  const loginForm = document.getElementById('loginForm');
+  if(loginForm) loginForm.onsubmit = (e)=>{
+    e.preventDefault();
+    const email = document.getElementById('li_email').value.trim().toLowerCase();
+    const pass = document.getElementById('li_pass').value;
+    const u = state.users.find(x=>x.email.toLowerCase()===email && x.password===pass);
+    const err = document.getElementById('loginError');
+    if(!u){ err.textContent='البريد الإلكتروني أو كلمة المرور غير صحيحة.'; err.style.display='block'; return; }
+    if(u.status==='rejected'){ err.textContent='تم رفض هذا الحساب سابقًا. تواصل مع أحد الخدام.'; err.style.display='block'; return; }
+    if(u.status==='banned'){ err.textContent='هذا الحساب محظور. تواصل مع الإداري العام.'; err.style.display='block'; return; }
+    state.session.userId = u.id; persist(); render();
+  };
+  const signupForm = document.getElementById('signupForm');
+  if(signupForm) signupForm.onsubmit = (e)=>{
+    e.preventDefault();
+    const email = document.getElementById('su_email').value.trim().toLowerCase();
+    const mobile = document.getElementById('su_mobile').value.trim();
+    const normMobile = mobile.replace(/\D/g,'');
+    const err = document.getElementById('signupError');
+    if(state.users.some(x=>x.email.toLowerCase()===email)){ err.textContent='هذا البريد الإلكتروني مسجّل من قبل.'; err.style.display='block'; return; }
+    if(normMobile && state.users.some(x=>x.mobile.replace(/\D/g,'')===normMobile)){ err.textContent='رقم الموبايل هذا مسجّل من قبل بحساب آخر.'; err.style.display='block'; return; }
+    const nu = { id: uid('u'), name: document.getElementById('su_name').value.trim(), email,
+      mobile, address: document.getElementById('su_address').value.trim(),
+      password: document.getElementById('su_pass').value, role:'makhdoum', status:'pending', classroomId:null, points:0, createdAt: nowISO() };
+    state.users.push(nu);
+    log(nu.name, 'أرسل طلب انضمام جديد (بانتظار الموافقة).');
+    state.session.userId = nu.id; persist(); render();
+  };
+  const toggleEm = document.getElementById('toggleEmergency');
+  if(toggleEm) toggleEm.onclick = ()=>{ const box = document.getElementById('emergencyBox'); box.style.display = box.style.display==='none' ? 'block' : 'none'; };
+  const emBtn = document.getElementById('emergencyBtn');
+  if(emBtn) emBtn.onclick = ()=>{
+    const email = document.getElementById('em_email').value.trim().toLowerCase();
+    const code = document.getElementById('em_code').value.trim().toUpperCase();
+    const pass = document.getElementById('em_pass').value.trim();
+    const cred = getEmergencyCredential();
+    const u = state.users.find(x=>x.email.toLowerCase()===email && (x.role==='khadim'||x.role==='senior_admin') && x.status==='approved');
+    if(!u){ showToast('لا يوجد خادم بهذا البريد الإلكتروني.'); return; }
+    if(code !== cred.code || pass !== cred.pass){ showToast('كود أو كلمة مرور الطوارئ غير صحيحة.'); return; }
+    if(u.role !== 'senior_admin'){
+      state.emergency = { active:true, byUserId:u.id, originalRole:u.role, grantedAt: nowISO(), log: state.emergency.log };
+      u.role = 'senior_admin';
+      log(u.name, 'استخدم كود الطوارئ للحصول على صلاحيات الإداري العام لمدة ٢٤ ساعة.');
+      state.emergency.log.unshift({ id:uid('elog'), time: nowISO(), who:u.name });
+    }
+    state.session.userId = u.id; persist(); showToast('تم تفعيل الوصول الطارئ لمدة ٢٤ ساعة.'); render();
+  };
+}
+function renderPending(u){
+  return `<div class="auth-wrap"><div class="auth-crest">${crestSVG(64)}</div>
+    <h1 class="auth-title" style="font-size:22px;">بانتظار الموافقة</h1>
+    <p class="auth-sub">أهلًا ${escapeHtml(u.name)}، تم إرسال طلبك بنجاح.<br>سيصلك إشعار بمجرد موافقة أحد الخدام أو الإداريين على انضمامك.</p>
+    <button class="btn btn-outline" id="logoutBtn2">تسجيل الخروج</button></div>`;
+}
+function renderRejected(u){
+  return `<div class="auth-wrap"><div class="auth-crest">${crestSVG(64)}</div>
+    <h1 class="auth-title" style="font-size:22px;">تعذّر قبول الطلب</h1>
+    <p class="auth-sub">${escapeHtml(u.name)}، لم تتم الموافقة على هذا الحساب. للاستفسار برجاء التواصل مباشرة مع أحد الخدام.</p>
+    <button class="btn btn-outline" id="logoutBtn2">تسجيل الخروج</button></div>`;
+}
+function renderBanned(u){
+  return `<div class="auth-wrap"><div class="auth-crest">${crestSVG(64)}</div>
+    <h1 class="auth-title" style="font-size:22px;color:var(--bad);">الحساب محظور</h1>
+    <p class="auth-sub">${escapeHtml(u.name)}، تم حظر هذا الحساب من الدخول إلى التطبيق. للاستفسار برجاء التواصل مباشرة مع الإداري العام.</p>
+    <button class="btn btn-outline" id="logoutBtn2">تسجيل الخروج</button></div>`;
+}
+function bindPendingEvents(){ const b = document.getElementById('logoutBtn2'); if(b) b.onclick = ()=>{ state.session.userId=null; persist(); render(); }; }
+
+/* ---------------- APP SHELL ---------------- */
+function tabsFor(role){
+  if(role==='makhdoum') return [
+    {id:'news', label:'الأخبار', ic:'📰'}, {id:'mine', label:'حضوري', ic:'✅'}, {id:'chat', label:'الدردشة', ic:'💬'}, {id:'settings', label:'الإعدادات', ic:'⚙️'},
+  ];
+  const base = [
+    {id:'news', label:'الأخبار', ic:'📰'}, {id:'ministry', label:'الخدمة', ic:'🗂️'}, {id:'chat', label:'الدردشة', ic:'💬'},
+  ];
+  if(role==='senior_admin') base.push({id:'admin', label:'الإدارة', ic:'🛡️'});
+  base.push({id:'settings', label:'الإعدادات', ic:'⚙️'});
+  return base;
+}
+function roleLabel(r){ return r==='senior_admin' ? 'إداري عام' : r==='khadim' ? 'خادم' : 'مخدوم'; }
+
+function renderApp(u){
+  const tabs = tabsFor(u.role);
+  if(!tabs.find(t=>t.id===ui.activeTab)) ui.activeTab = 'news';
+  let emergencyBanner = '';
+  if(state.emergency.active && state.emergency.byUserId===u.id){
+    const grantedAt = new Date(state.emergency.grantedAt).getTime();
+    const remaining = Math.max(0, 24*3600*1000 - (Date.now()-grantedAt));
+    const h = Math.floor(remaining/3600000), m = Math.floor((remaining%3600000)/60000);
+    emergencyBanner = `<div class="emergency-banner"><span>⚠️ وضع الوصول الطارئ نشط — يتبقّى ${h} س ${m} د</span><button id="endEmergencyNow">إنهاء الآن</button></div>`;
+  }
+  return `
+  <div class="topbar">
+    ${crestSVG(32)}
+    <div class="titles"><h1>خِدمة</h1><div class="sub">${roleLabel(u.role)} · ${escapeHtml(u.name.split(' ')[0])}</div></div>
+  </div>
+  ${emergencyBanner}
+  <div class="content" id="contentArea">${renderTab(u, ui.activeTab)}</div>
+  <div class="tabbar">${tabs.map(t=>`<button class="tab ${ui.activeTab===t.id?'active':''}" data-tab="${t.id}"><span class="ic">${t.ic}</span>${t.label}</button>`).join('')}</div>
+  ${ui.toast ? `<div class="toast">${ui.toast}</div>` : ''}
+  ${ui.scanning ? renderScanOverlay() : ''}
+  ${ui.confirm ? `<div class="confirm-overlay"><div class="confirm-box"><p>${escapeHtml(ui.confirm.message)}</p><div class="row"><button class="btn btn-outline btn-sm" id="confirmNo" style="flex:1;">إلغاء</button><button class="btn btn-danger btn-sm" id="confirmYes" style="flex:1;">تأكيد</button></div></div></div>` : ''}
+  `;
+}
+function renderTab(u, tab){
+  if(tab==='news') return renderNews(u);
+  if(tab==='mine') return renderMine(u);
+  if(tab==='ministry') return renderMinistry(u);
+  if(tab==='chat') return renderChat(u);
+  if(tab==='admin') return renderAdmin(u);
+  if(tab==='settings') return renderSettings(u);
+  return '';
+}
+
+/* ---------------- SETTINGS ---------------- */
+function renderSettings(u){
+  const cls = classroomOf(u.classroomId);
+  return `
+  <div class="screen">
+    <h2 class="section-title">الإعدادات</h2>
+
+    <div class="card">
+      <b style="font-size:14px;">البيانات الشخصية</b>
+      <div class="field" style="margin-top:10px;"><span class="label">الاسم بالكامل</span><input type="text" id="set_name" value="${escapeHtml(u.name)}"></div>
+      <div class="field"><span class="label">البريد الإلكتروني</span><input type="email" id="set_email" value="${escapeHtml(u.email)}"></div>
+      <div class="field"><span class="label">رقم الموبايل</span><input type="tel" id="set_mobile" value="${escapeHtml(u.mobile)}"></div>
+      <div class="field"><span class="label">العنوان</span><input type="text" id="set_address" value="${escapeHtml(u.address)}"></div>
+      <div id="settingsProfileError" class="muted" style="color:var(--bad);display:none;margin-bottom:8px;"></div>
+      <button class="btn btn-gold" id="saveProfileBtn">حفظ التعديلات</button>
+      <p class="muted" style="margin-top:8px;">الدور: ${roleLabel(u.role)}${cls ? ' · الفصل: '+escapeHtml(cls.name) : ''}</p>
+    </div>
+
+    <div class="card">
+      <b style="font-size:14px;">تغيير كلمة المرور</b>
+      <div class="field" style="margin-top:10px;"><span class="label">كلمة المرور الحالية</span><input type="password" id="set_pass_current"></div>
+      <div class="field"><span class="label">كلمة المرور الجديدة</span><input type="password" id="set_pass_new" minlength="4"></div>
+      <div id="settingsPassError" class="muted" style="color:var(--bad);display:none;margin-bottom:8px;"></div>
+      <button class="btn btn-outline" id="changePasswordBtn">تحديث كلمة المرور</button>
+    </div>
+
+    <div class="card" style="border-color:var(--bad);">
+      <b style="font-size:14px;color:var(--bad);">منطقة الخطر</b>
+      <p class="muted" style="margin:8px 0 12px;">حذف الحساب نهائي ولا يمكن التراجع عنه.</p>
+      <div class="row">
+        <button class="btn btn-outline" id="settingsLogoutBtn">تسجيل الخروج</button>
+        <button class="btn btn-danger" id="settingsDeleteBtn">حذف حسابي نهائيًا</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- NEWS ---------------- */
+function renderNews(u){
+  const canPost = isAdminish(u);
+  const items = [...state.news].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  return `
+  <div class="screen">
+    <h2 class="section-title">الأخبار والإعلانات</h2>
+    ${canPost ? `<div class="card">
+      <div class="field"><input type="text" id="news_title" placeholder="عنوان الخبر"></div>
+      <div class="field"><textarea id="news_body" placeholder="تفاصيل الإعلان..."></textarea></div>
+      <button class="btn btn-gold" id="postNewsBtn">نشر الإعلان</button>
+    </div>` : ''}
+    ${items.length===0 ? `<div class="empty"><div class="big">📭</div>لا توجد إعلانات بعد.</div>` :
+      items.map(n=>`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <b style="font-size:15.5px;">${escapeHtml(n.title)}</b>
+          ${(u.role==='senior_admin' || n.authorId===u.id) ? `<button class="btn-ghost" data-del-news="${n.id}" style="color:var(--bad);">حذف</button>` : ''}
+        </div>
+        <p style="margin:8px 0 6px;font-size:14px;line-height:1.8;">${escapeHtml(n.content)}</p>
+        <div class="muted">${escapeHtml(n.authorName)} · ${fmtDate(n.createdAt)}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+/* ---------------- MINE (member: attendance + points + QR) ---------------- */
+function renderMine(u){
+  const records = state.attendance.filter(a=>a.memberId===u.id).sort((a,b)=> b.date.localeCompare(a.date));
+  const totalQ = records.filter(r=>r.quddas).length, totalI = records.filter(r=>r.ijtimaa).length;
+  const cls = classroomOf(u.classroomId);
+  const myAssignments = state.assignments.filter(a=> !a.classroomId || a.classroomId===u.classroomId);
+  return `
+  <div class="screen">
+    <h2 class="section-title">حضوري ونقاطي</h2>
+    <div class="card" style="text-align:center;">
+      <div class="muted">إجمالي نقاطي</div>
+      <div style="font-size:34px;font-weight:800;color:var(--heading);">${u.points||0}</div>
+      <div id="qrHolder" style="margin:14px auto 4px;width:150px;height:150px;background:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:8px;"></div>
+      <div class="muted">أظهر هذا الرمز لأحد الخدام لتسجيل حضورك بالمسح</div>
+    </div>
+    <div class="card tight">
+      <div class="muted">الفصل: ${cls ? escapeHtml(cls.name) : '— غير محدد —'}</div>
+      <div class="row" style="margin-top:10px;">
+        <div class="card tight" style="text-align:center;flex:1;margin:0;"><div style="font-size:20px;font-weight:800;color:var(--ok);">${totalQ}</div><div class="muted">حضور قداس</div></div>
+        <div class="card tight" style="text-align:center;flex:1;margin:0;"><div style="font-size:20px;font-weight:800;color:var(--ok);">${totalI}</div><div class="muted">حضور اجتماع</div></div>
+      </div>
+    </div>
+    <h3 style="font-size:13.5px;color:var(--text-soft);margin:16px 0 8px;">تكليفاتي</h3>
+    ${myAssignments.length===0 ? `<p class="muted">لا توجد تكليفات حاليًا.</p>` :
+      myAssignments.map(a=>{
+        const done = !!a.completions[u.id];
+        return `<div class="card tight" style="display:flex;justify-content:space-between;align-items:center;">
+          <div><b style="font-size:13.5px;">${escapeHtml(a.title)}</b><div class="muted">${escapeHtml(a.description||'')}</div></div>
+          <span class="badge ${done?'badge-ok':'badge-gold'}">${done? '✓ '+a.points+' نقطة' : a.points+' نقطة'}</span>
+        </div>`;
+      }).join('')
+    }
+    <h3 style="font-size:13.5px;color:var(--text-soft);margin:16px 0 8px;">سجل الحضور</h3>
+    ${records.length===0 ? `<div class="empty"><div class="big">🗒️</div>لا يوجد سجل حضور بعد.</div>` :
+      `<div class="card"><ul class="plain">${records.map(r=>`
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);">
+          <span>${fmtDate(r.date)}</span>
+          <span style="display:flex;gap:6px;">
+            <span class="badge ${r.quddas?'badge-ok':'badge-bad'}">قداس ${r.quddas?'✓':'✗'}</span>
+            <span class="badge ${r.ijtimaa?'badge-ok':'badge-bad'}">اجتماع ${r.ijtimaa?'✓':'✗'}</span>
+          </span>
+        </li>`).join('')}</ul></div>`}
+  </div>`;
+}
+
+/* ---------------- MINISTRY (khadim/senior_admin: attendance + assignments + points) ---------------- */
+function renderMinistry(u){
+  const sub = ui.ministrySub || 'attendance';
+  return `
+  <div class="screen">
+    <h2 class="section-title">الخدمة</h2>
+    <div class="segmented">
+      <button class="${sub==='attendance'?'active':''}" data-ministry="attendance">الحضور</button>
+      <button class="${sub==='assignments'?'active':''}" data-ministry="assignments">التكليفات</button>
+      <button class="${sub==='points'?'active':''}" data-ministry="points">النقاط</button>
+    </div>
+    ${sub==='attendance' ? renderAttendanceAdmin(u) : ''}
+    ${sub==='assignments' ? renderAssignments(u) : ''}
+    ${sub==='points' ? renderPoints(u) : ''}
+  </div>`;
+}
+
+function renderAttendanceAdmin(u){
+  const viewClassrooms = state.classrooms;
+  if(!ui.adminAttClassroom || !state.classrooms.find(c=>c.id===ui.adminAttClassroom)){
+    ui.adminAttClassroom = (myClassrooms(u)[0] || viewClassrooms[0] || {}).id || null;
+  }
+  const activeCls = classroomOf(ui.adminAttClassroom);
+  const canEdit = activeCls && (u.role==='senior_admin' || activeCls.servantIds.includes(u.id));
+  const members = activeCls ? membersOfClassroom(activeCls.id) : [];
+  const date = todayStr();
+  return `
+    <div class="segmented">${viewClassrooms.map(c=>`<button class="${ui.adminAttClassroom===c.id?'active':''}" data-cls="${c.id}">${escapeHtml(c.name)}${c.servantIds.includes(u.id)?' (فصلي)':''}</button>`).join('')}</div>
+    ${!activeCls ? `<div class="empty"><div class="big">🏫</div>لا توجد فصول بعد.</div>` : `
+    <div class="card tight" style="display:flex;justify-content:space-between;align-items:center;">
+      <span class="muted">التاريخ: ${fmtDate(date)} (اليوم)</span>
+      ${canEdit ? `<button class="btn btn-teal btn-sm" id="openScanBtn">📷 مسح للحضور</button>` : `<span class="badge badge-ink">عرض فقط</span>`}
+    </div>
+    <div class="card">
+      ${members.length===0 ? `<div class="empty">لا يوجد أعضاء في هذا الفصل بعد.</div>` :
+        members.map(m=>{
+          const rec = state.attendance.find(a=>a.memberId===m.id && a.date===date);
+          const q = rec ? rec.quddas : false, i = rec ? rec.ijtimaa : false;
+          return `<div class="member-row">
+            <div class="avatar">${initials(m.name)}</div>
+            <div class="m-name">${escapeHtml(m.name)}<small>${m.points||0} نقطة</small></div>
+            <div class="check ${q?'on':''}" ${canEdit?'':'disabled'} data-att="${m.id}" data-field="quddas" title="القداس">${q?'✓':''}</div>
+            <div class="check ${i?'on':''}" ${canEdit?'':'disabled'} data-att="${m.id}" data-field="ijtimaa" title="الاجتماع">${i?'✓':''}</div>
+          </div>`;
+        }).join('')}
+    </div>
+    <div class="card tight muted" style="text-align:center;">✓ يسار = القداس (+${state.settings.pointsQuddas} نقطة) &nbsp;&nbsp; ✓ يمين = الاجتماع (+${state.settings.pointsIjtimaa} نقطة)</div>
+    `}`;
+}
+
+function renderAssignments(u){
+  const canCreate = isAdminish(u);
+  const editableClassrooms = myClassrooms(u);
+  const list = u.role==='senior_admin' ? state.assignments : state.assignments.filter(a=> !a.classroomId || editableClassrooms.some(c=>c.id===a.classroomId));
+  return `
+    ${canCreate ? `
+    <div class="card">
+      <b style="font-size:14px;">تكليف جديد</b>
+      <div class="field" style="margin-top:10px;"><input type="text" id="asg_title" placeholder="عنوان التكليف"></div>
+      <div class="field"><textarea id="asg_desc" placeholder="وصف مختصر (اختياري)"></textarea></div>
+      <div class="row">
+        <div class="field"><span class="label">قيمة النقاط</span><input type="number" id="asg_points" value="10" min="0"></div>
+        <div class="field"><span class="label">الفصل</span>
+          <select id="asg_cls">
+            <option value="">كل الفصول</option>
+            ${state.classrooms.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-gold" id="addAssignmentBtn">إضافة التكليف</button>
+    </div>` : ''}
+    ${list.length===0 ? `<div class="empty"><div class="big">📋</div>لا توجد تكليفات بعد.</div>` :
+      list.map(a=>{
+        const cls = classroomOf(a.classroomId);
+        const members = a.classroomId ? membersOfClassroom(a.classroomId) : state.users.filter(x=>x.role==='makhdoum'&&x.status==='approved');
+        const doneCount = Object.keys(a.completions).length;
+        return `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div><b style="font-size:14.5px;">${escapeHtml(a.title)}</b><div class="muted">${escapeHtml(cls?cls.name:'كل الفصول')} · أنجزها ${doneCount}/${members.length}</div></div>
+            ${canCreate ? `<button class="btn-ghost" data-del-asg="${a.id}" style="color:var(--bad);">حذف</button>` : ''}
+          </div>
+          ${a.description ? `<p class="muted" style="margin:6px 0;">${escapeHtml(a.description)}</p>` : ''}
+          <div class="row" style="align-items:center;margin:8px 0 10px;">
+            <span class="muted">قيمة النقاط:</span>
+            ${canCreate ? `<input type="number" min="0" data-asg-points="${a.id}" value="${a.points}" style="width:70px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--line);">` : `<b>${a.points}</b>`}
+          </div>
+          ${canCreate ? `<div class="checklist">
+            ${members.map(m=>`<label><input type="checkbox" data-asg-check="${a.id}|${m.id}" ${a.completions[m.id]?'checked':''}> ${escapeHtml(m.name)} ${a.completions[m.id]?`<span class="badge badge-ok" style="margin-right:auto;">تم</span>`:''}</label>`).join('')}
+          </div>` : ''}
+        </div>`;
+      }).join('')}
+  `;
+}
+
+function renderPoints(u){
+  const canEditSettings = u.role==='senior_admin';
+  const scope = u.role==='senior_admin' ? state.classrooms : myClassrooms(u);
+  const memberIds = new Set();
+  scope.forEach(c=> membersOfClassroom(c.id).forEach(m=>memberIds.add(m.id)));
+  const members = state.users.filter(m=>memberIds.has(m.id)).sort((a,b)=> (b.points||0)-(a.points||0));
+  return `
+    <div class="card">
+      <b style="font-size:14px;">إعدادات نقاط الحضور</b>
+      <div class="row" style="margin-top:10px;">
+        <div class="field"><span class="label">نقاط حضور القداس</span><input type="number" id="pts_quddas" value="${state.settings.pointsQuddas}" min="0" ${canEditSettings?'':'disabled'}></div>
+        <div class="field"><span class="label">نقاط حضور الاجتماع</span><input type="number" id="pts_ijtimaa" value="${state.settings.pointsIjtimaa}" min="0" ${canEditSettings?'':'disabled'}></div>
+      </div>
+      ${canEditSettings ? `<button class="btn btn-teal" id="savePointsSettings">حفظ الإعدادات</button>` : `<p class="muted">الإداري العام فقط يمكنه تعديل هذه القيم.</p>`}
+    </div>
+    <h3 style="font-size:13.5px;color:var(--text-soft);margin:16px 0 8px;">نقاط الأعضاء</h3>
+    ${members.length===0 ? `<p class="muted">لا يوجد أعضاء في نطاق فصولك بعد.</p>` :
+      members.map(m=>`
+      <div class="card tight" style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="m-name" style="flex:1;">${escapeHtml(m.name)}</div>
+        <div class="points-pill">
+          <button data-pts-adj="${m.id}|-1">−</button>
+          <span class="val">${m.points||0}</span>
+          <button data-pts-adj="${m.id}|1">+</button>
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+/* ---------------- CHAT ---------------- */
+function renderChat(u){
+  if(ui.openChatId){ const chat = state.chats.find(c=>c.id===ui.openChatId); if(chat) return renderChatThread(u, chat); ui.openChatId = null; }
+  if(u.role==='makhdoum'){
+    let myChat = [...state.chats].filter(c=>c.memberId===u.id).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt))[0];
+    if(!myChat || myChat.status==='closed'){
+      return `<div class="screen"><h2 class="section-title">تواصل مع الخدمة</h2>
+        <div class="empty"><div class="big">💬</div>${myChat ? 'تم إغلاق محادثتك السابقة.' : 'ليس لديك محادثة حاليًا.'}<br>ابدأ محادثة جديدة مع أحد الخدام.</div>
+        <button class="btn btn-gold" id="newChatBtn">بدء محادثة جديدة</button></div>`;
+    }
+    ui.openChatId = myChat.id;
+    return renderChatThread(u, myChat);
+  }
+  const unclaimed = state.chats.filter(c=>c.status==='unclaimed');
+  const mine = state.chats.filter(c=>c.claimedById===u.id && c.status==='claimed');
+  return `
+  <div class="screen">
+    <h2 class="section-title">قائمة الدردشات</h2>
+    <h3 style="font-size:13.5px;color:var(--text-soft);margin:0 0 8px;">غير مُستلمة (${unclaimed.length})</h3>
+    ${unclaimed.length===0 ? `<p class="muted" style="margin-bottom:16px;">لا توجد محادثات بانتظار الاستلام.</p>` :
+      unclaimed.map(c=>`<div class="chat-list-item" data-openchat="${c.id}">
+        <div class="avatar">${initials(c.memberName)}</div>
+        <div style="flex:1;min-width:0;"><b>${escapeHtml(c.memberName)}</b><div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.messages[c.messages.length-1]?.text || '')}</div></div>
+        <button class="btn btn-gold btn-sm" data-claim="${c.id}">استلام</button>
+      </div>`).join('')}
+    <h3 style="font-size:13.5px;color:var(--text-soft);margin:18px 0 8px;">محادثاتي (${mine.length})</h3>
+    ${mine.length===0 ? `<p class="muted">لا توجد محادثات مستلمة حاليًا.</p>` :
+      mine.map(c=>`<div class="chat-list-item" data-openchat="${c.id}">
+        <div class="avatar">${initials(c.memberName)}</div>
+        <div style="flex:1;min-width:0;"><b>${escapeHtml(c.memberName)}</b><div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.messages[c.messages.length-1]?.text || '')}</div></div>
+      </div>`).join('')}
+  </div>`;
+}
+function renderChatThread(u, chat){
+  const isMember = u.role==='makhdoum';
+  const canReply = isMember || chat.claimedById===u.id;
+  const statusBadge = chat.status==='unclaimed' ? `<span class="badge badge-gold">بانتظار استلام أحد الخدام</span>`
+    : chat.status==='claimed' ? `<span class="badge badge-ok">${isMember ? 'يتحدث معك: '+escapeHtml(chat.claimedByName) : 'مستلمة بواسطتك'}</span>`
+    : `<span class="badge badge-ink">تم إغلاق المحادثة</span>`;
+  return `
+  <div class="screen">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <button class="btn-ghost" id="backToChatList">‹ رجوع</button>
+      <b style="flex:1;">${isMember ? 'محادثتي' : escapeHtml(chat.memberName)}</b>
+      ${(!isMember && chat.status==='claimed' && chat.claimedById===u.id) ? `<button class="btn-ghost" id="closeChatBtn" style="color:var(--bad);">إنهاء</button>` : ''}
+    </div>
+    <div class="card tight" style="margin-bottom:10px;">${statusBadge}</div>
+    <div class="chat-thread">
+      <div class="thread-msgs">${chat.messages.map(m=>{
+        const cls = (isMember ? m.sender==='member' : m.sender==='admin') ? 'me' : 'them';
+        return `<div class="bubble ${cls}">${escapeHtml(m.text)}<span class="t">${fmtTime(m.time)}${m.senderName?' · '+escapeHtml(m.senderName):''}</span></div>`;
+      }).join('')}</div>
+      ${canReply && chat.status!=='closed' ? `<div class="thread-input"><input type="text" id="chatInput" placeholder="اكتب رسالتك..."><button class="btn btn-primary" id="sendChatBtn">إرسال</button></div>`
+        : chat.status==='closed' ? `<p class="muted" style="text-align:center;padding-top:8px;">هذه المحادثة مغلقة.</p>`
+        : `<p class="muted" style="text-align:center;padding-top:8px;">بانتظار استلام أحد الخدام قبل أن تتمكن من الرد.</p>`}
+    </div>
+  </div>`;
+}
+
+/* ---------------- ADMIN ---------------- */
+function renderAdmin(u){
+  const sub = ui.adminSub || 'pending';
+  const pendingUsers = state.users.filter(x=>x.status==='pending');
+  return `
+  <div class="screen">
+    <h2 class="section-title">لوحة الإدارة</h2>
+    <div class="segmented">
+      <button class="${sub==='pending'?'active':''}" data-adminsub="pending">طلبات الانتظار ${pendingUsers.length?('('+pendingUsers.length+')'):''}</button>
+      <button class="${sub==='people'?'active':''}" data-adminsub="people">الخدام والفصول</button>
+      <button class="${sub==='emergency'?'active':''}" data-adminsub="emergency">كود الطوارئ</button>
+      <button class="${sub==='log'?'active':''}" data-adminsub="log">سجل النشاط</button>
+    </div>
+    ${sub==='pending' ? renderAdminPending(pendingUsers) : ''}
+    ${sub==='people' ? renderAdminPeople(u) : ''}
+    ${sub==='emergency' ? renderAdminEmergency() : ''}
+    ${sub==='log' ? renderAdminLog() : ''}
+  </div>`;
+}
+function renderAdminPending(list){
+  if(list.length===0) return `<div class="empty"><div class="big">✅</div>لا توجد طلبات بانتظار المراجعة.</div>`;
+  return list.map(p=>`
+    <div class="card"><b>${escapeHtml(p.name)}</b>
+      <div class="muted" style="margin:4px 0;">${escapeHtml(p.email)} · ${escapeHtml(p.mobile)}</div>
+      <div class="muted" style="margin-bottom:10px;">${escapeHtml(p.address)}</div>
+      <div class="row"><button class="btn btn-gold btn-sm" data-approve="${p.id}">✓ قبول</button><button class="btn btn-outline btn-sm" data-reject="${p.id}" style="color:var(--bad);border-color:var(--bad);">✗ رفض</button></div>
+    </div>`).join('');
+}
+function renderAdminPeople(u){
+  const khadim = state.users.filter(x=>x.role==='khadim' && x.status==='approved');
+  const seniors = state.users.filter(x=>x.role==='senior_admin' && x.status==='approved');
+  const makhdoumeen = state.users.filter(x=>x.role==='makhdoum' && x.status==='approved');
+  const banned = state.users.filter(x=>x.status==='banned');
+  const dangerButtons = (p)=> p.id===u.id ? `<span class="muted">(حسابك)</span>` : `
+    <button class="btn-ghost" data-ban-user="${p.id}" style="color:var(--bad);">حظر</button>
+    <button class="btn-ghost" data-delete-user="${p.id}" style="color:var(--bad);">حذف نهائي</button>`;
+  return `
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:4px 0 8px;">إضافة فصل جديد</h3>
+  <div class="card tight row" style="align-items:center;">
+    <input type="text" id="newClassName" placeholder="اسم الفصل الجديد" style="flex:2;padding:9px 10px;border-radius:8px;border:1.5px solid var(--line);">
+    <button class="btn btn-gold btn-sm" id="addClassroomBtn" style="flex:1;">إضافة</button>
+  </div>
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:18px 0 8px;">الفصول وتعيين الخدام (يمكن اختيار أكثر من خادم)</h3>
+  ${state.classrooms.map(c=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b>${escapeHtml(c.name)}</b>
+        <button class="btn-ghost" data-del-cls="${c.id}" style="color:var(--bad);">حذف الفصل</button>
+      </div>
+      <div class="checklist" style="margin-top:10px;">
+        ${khadim.length===0 ? `<span class="muted">لا يوجد خدام معتمدون بعد.</span>` :
+          khadim.map(k=>`<label><input type="checkbox" data-cls-servant="${c.id}|${k.id}" ${c.servantIds.includes(k.id)?'checked':''}> ${escapeHtml(k.name)}</label>`).join('')}
+      </div>
+      <div class="muted" style="margin-top:8px;">عدد الأعضاء: ${membersOfClassroom(c.id).length}</div>
+    </div>`).join('')}
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:18px 0 8px;">الإداريون العامون (${seniors.length})</h3>
+  ${seniors.map(s=>`
+    <div class="card tight">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span>${escapeHtml(s.name)}</span><span class="badge badge-gold">إداري عام</span></div>
+      <div class="row" style="gap:6px;margin-top:8px;justify-content:flex-end;">${dangerButtons(s)}</div>
+    </div>`).join('')}
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:18px 0 8px;">الخدام (${khadim.length})</h3>
+  ${khadim.map(k=>`
+    <div class="card tight">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span>${escapeHtml(k.name)}</span><button class="btn-ghost" data-promote="${k.id}">ترقية لإداري عام</button></div>
+      <div class="row" style="gap:6px;margin-top:8px;justify-content:flex-end;">${dangerButtons(k)}</div>
+    </div>`).join('')}
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:18px 0 8px;">المخدومين (${makhdoumeen.length})</h3>
+  ${makhdoumeen.map(m=>`
+    <div class="card tight">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span>${escapeHtml(m.name)}</span><button class="btn-ghost" data-promotekh="${m.id}">ترقية لخادم</button></div>
+      <div class="row" style="gap:6px;margin-top:8px;justify-content:flex-end;">${dangerButtons(m)}</div>
+    </div>`).join('')}
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:18px 0 8px;">الحسابات المحظورة (${banned.length})</h3>
+  ${banned.length===0 ? `<p class="muted">لا توجد حسابات محظورة حاليًا.</p>` :
+    banned.map(b=>`
+    <div class="card tight">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span>${escapeHtml(b.name)}</span><span class="badge badge-bad">محظور</span></div>
+      <div class="muted" style="margin:4px 0;">${escapeHtml(b.email)} · ${roleLabel(b.role)}</div>
+      <div class="row" style="gap:6px;margin-top:6px;">
+        <button class="btn btn-teal btn-sm" data-unban-user="${b.id}">إلغاء الحظر</button>
+        <button class="btn btn-outline btn-sm" data-delete-user="${b.id}" style="color:var(--bad);border-color:var(--bad);">حذف نهائي</button>
+      </div>
+    </div>`).join('')}
+  `;
+}
+function renderAdminEmergency(){
+  const cred = getEmergencyCredential();
+  const remaining = cred.nextRefresh - Date.now();
+  const mm = Math.floor(remaining/60000), ss = Math.floor((remaining%60000)/1000);
+  return `
+  <div class="card">
+    <div class="muted" style="margin-bottom:8px;">كود الوصول الطارئ الحالي (يتغيّر تلقائيًا كل ساعة)</div>
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;text-align:center;background:var(--parchment-2);border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-soft);">الكود</div><div style="font-size:20px;font-weight:800;letter-spacing:3px;color:var(--heading);">${cred.code}</div></div>
+      <div style="flex:1;text-align:center;background:var(--parchment-2);border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-soft);">كلمة المرور</div><div style="font-size:20px;font-weight:800;letter-spacing:3px;color:var(--heading);">${cred.pass}</div></div>
+    </div>
+    <p class="muted" style="text-align:center;margin-top:10px;">يتغير الكود خلال ${mm} د ${ss} ث. يمنح صلاحيات الإداري العام لمدة ٢٤ ساعة ثم يعود المستخدم تلقائيًا لدوره الأصلي.</p>
+  </div>
+  ${state.emergency.active ? `<div class="card tight" style="border-color:var(--oxblood);">
+    <b style="color:var(--oxblood);">وضع طارئ نشط حاليًا</b>
+    <div class="muted">بواسطة: ${escapeHtml((state.users.find(x=>x.id===state.emergency.byUserId)||{}).name || '—')}</div>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--bad);border-color:var(--bad);" id="forceEndEmergency">إنهاء الوصول الطارئ الآن</button>
+  </div>` : ''}
+  <h3 style="font-size:13.5px;color:var(--text-soft);margin:16px 0 8px;">سجل استخدام كود الطوارئ</h3>
+  ${state.emergency.log.length===0 ? `<p class="muted">لم يُستخدم كود الطوارئ بعد.</p>` :
+    state.emergency.log.map(e=>`<div class="card tight"><b>${escapeHtml(e.who)}</b><div class="muted">${new Date(e.time).toLocaleString('ar-EG')}</div></div>`).join('')}`;
+}
+function renderAdminLog(){
+  return state.auditLog.map(l=>`<div class="card tight"><div style="display:flex;justify-content:space-between;"><b style="font-size:13px;">${escapeHtml(l.actor)}</b><span class="muted">${new Date(l.time).toLocaleString('ar-EG')}</span></div><div style="font-size:13px;margin-top:3px;">${escapeHtml(l.action)}</div></div>`).join('');
+}
+
+/* ---------------- SCANNER ---------------- */
+function renderScanOverlay(){
+  return `<div class="scan-overlay">
+    <div class="scan-top"><span></span><button id="closeScanBtn">✕</button></div>
+    <video id="scanVideo" playsinline muted autoplay></video>
+    <div class="scan-frame"></div>
+    <canvas id="scanCanvas" style="display:none;"></canvas>
+    <div class="scan-status" id="scanStatus">وجّه الكاميرا نحو رمز QR الخاص بالعضو</div>
+  </div>`;
+}
+let scanStream = null, scanRAF = null;
+function startScanner(){
+  const video = document.getElementById('scanVideo');
+  if(!video || video.dataset.started) return;
+  video.dataset.started = '1';
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    document.getElementById('scanStatus').textContent = 'الكاميرا غير متاحة في هذا المتصفح.'; return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } }).then(stream=>{
+    scanStream = stream; video.srcObject = stream; video.play();
+    const canvas = document.getElementById('scanCanvas'); const ctx = canvas.getContext('2d');
+    function tick(){
+      if(!ui.scanning) return;
+      if(video.readyState === video.HAVE_ENOUGH_DATA && window.jsQR){
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = window.jsQR(img.data, img.width, img.height);
+        if(code && code.data){ handleScanResult(code.data); return; }
+      }
+      scanRAF = requestAnimationFrame(tick);
+    }
+    scanRAF = requestAnimationFrame(tick);
+  }).catch(()=>{ const s = document.getElementById('scanStatus'); if(s) s.textContent = 'تعذّر الوصول إلى الكاميرا. تأكد من إذن الكاميرا.'; });
+}
+function stopScanner(){
+  ui.scanning = false;
+  if(scanRAF) cancelAnimationFrame(scanRAF);
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream = null; }
+}
+function handleScanResult(data){
+  const u = currentUser();
+  const match = /^khidma-member:(.+)$/.exec(data.trim());
+  const memberId = match ? match[1] : null;
+  const member = memberId ? state.users.find(x=>x.id===memberId && x.role==='makhdoum') : null;
+  stopScanner();
+  if(!member){ showToast('رمز غير صالح.'); render(); return; }
+  const cls = classroomOf(ui.adminAttClassroom);
+  if(!cls || member.classroomId !== cls.id){ showToast('هذا العضو ليس ضمن الفصل الحالي.'); render(); return; }
+  const date = todayStr();
+  let rec = state.attendance.find(a=>a.memberId===member.id && a.date===date);
+  if(!rec){ rec = { id:uid('att'), memberId:member.id, classroomId:cls.id, date, quddas:false, ijtimaa:false, markedBy:u.id }; state.attendance.push(rec); }
+  if(!rec.quddas){ rec.quddas = true; awardPoints(member, state.settings.pointsQuddas, 'حضور القداس (مسح)', u.name); }
+  rec.markedBy = u.id;
+  log(u.name, `سجّل حضور ${member.name} عبر المسح الضوئي.`);
+  persist();
+  showToast(`تم تسجيل حضور ${member.name} ✓`);
+  render();
+}
+
+/* =========================================================================
+   EVENT BINDING for app shell
+   ========================================================================= */
+function bindAppEvents(u){
+  document.querySelectorAll('.tab').forEach(b=>{ b.onclick = ()=>{ ui.activeTab = b.dataset.tab; ui.openChatId=null; render(); }; });
+  const settingsLogoutBtn = document.getElementById('settingsLogoutBtn');
+  if(settingsLogoutBtn) settingsLogoutBtn.onclick = ()=>{ askConfirm('تسجيل الخروج؟', ()=>{ state.session.userId=null; persist(); render(); }); };
+  const settingsDeleteBtn = document.getElementById('settingsDeleteBtn');
+  if(settingsDeleteBtn) settingsDeleteBtn.onclick = ()=>{
+    if(u.role==='senior_admin' && state.users.filter(x=>x.role==='senior_admin'&&x.status==='approved').length<=1){
+      showToast('لا يمكنك حذف حسابك بصفتك الإداري العام الوحيد المتبقي.'); return;
+    }
+    askConfirm('حذف حسابك نهائيًا؟ لا يمكن التراجع عن هذا الإجراء، وستُسجَّل خروجك فورًا.', ()=>{
+      state.classrooms.forEach(c=>{ c.servantIds = c.servantIds.filter(id=>id!==u.id); });
+      state.users = state.users.filter(x=>x.id!==u.id);
+      log(u.name, 'حذف حسابه الخاص نهائيًا.');
+      state.session.userId = null;
+      persist(); render();
+    });
+  };
+  const saveProfileBtn = document.getElementById('saveProfileBtn');
+  if(saveProfileBtn) saveProfileBtn.onclick = ()=>{
+    const name = document.getElementById('set_name').value.trim();
+    const email = document.getElementById('set_email').value.trim().toLowerCase();
+    const mobile = document.getElementById('set_mobile').value.trim();
+    const address = document.getElementById('set_address').value.trim();
+    const normMobile = mobile.replace(/\D/g,'');
+    const err = document.getElementById('settingsProfileError');
+    if(!name || !email || !mobile || !address){ err.textContent='يرجى تعبئة كل الحقول.'; err.style.display='block'; return; }
+    if(state.users.some(x=>x.id!==u.id && x.email.toLowerCase()===email)){ err.textContent='هذا البريد الإلكتروني مستخدم بحساب آخر.'; err.style.display='block'; return; }
+    if(normMobile && state.users.some(x=>x.id!==u.id && x.mobile.replace(/\D/g,'')===normMobile)){ err.textContent='رقم الموبايل هذا مسجّل بحساب آخر.'; err.style.display='block'; return; }
+    err.style.display='none';
+    u.name=name; u.email=email; u.mobile=mobile; u.address=address;
+    log(u.name, 'حدّث بياناته الشخصية.'); persist(); showToast('تم حفظ التعديلات.'); render();
+  };
+  const changePasswordBtn = document.getElementById('changePasswordBtn');
+  if(changePasswordBtn) changePasswordBtn.onclick = ()=>{
+    const current = document.getElementById('set_pass_current').value;
+    const next = document.getElementById('set_pass_new').value;
+    const err = document.getElementById('settingsPassError');
+    if(current !== u.password){ err.textContent='كلمة المرور الحالية غير صحيحة.'; err.style.display='block'; return; }
+    if(!next || next.length<4){ err.textContent='كلمة المرور الجديدة يجب أن تكون ٤ أحرف على الأقل.'; err.style.display='block'; return; }
+    err.style.display='none';
+    u.password = next;
+    log(u.name, 'غيّر كلمة المرور الخاصة به.'); persist(); showToast('تم تحديث كلمة المرور.'); render();
+  };
+  const confirmYes = document.getElementById('confirmYes');
+  if(confirmYes) confirmYes.onclick = ()=>{ const action = ui.confirm && ui.confirm.onYes; ui.confirm = null; if(action) action(); else render(); };
+  const confirmNo = document.getElementById('confirmNo');
+  if(confirmNo) confirmNo.onclick = ()=>{ ui.confirm = null; render(); };
+  const endEm = document.getElementById('endEmergencyNow');
+  if(endEm) endEm.onclick = ()=>{ revertEmergency('تم إنهاء الوصول الطارئ يدويًا.'); persist(); render(); };
+
+  // QR code render for member "mine" tab
+  const qrHolder = document.getElementById('qrHolder');
+  if(qrHolder){
+    qrHolder.innerHTML = generateQRSvg('khidma-member:'+u.id);
+  }
+
+  // NEWS
+  const postNewsBtn = document.getElementById('postNewsBtn');
+  if(postNewsBtn) postNewsBtn.onclick = ()=>{
+    const title = document.getElementById('news_title').value.trim();
+    const body = document.getElementById('news_body').value.trim();
+    if(!title || !body){ showToast('يرجى إدخال العنوان والتفاصيل.'); return; }
+    state.news.push({ id:uid('news'), title, content:body, authorName:u.name, authorId:u.id, createdAt: nowISO() });
+    log(u.name, `نشر إعلانًا: "${title}"`); persist(); render();
+  };
+  document.querySelectorAll('[data-del-news]').forEach(b=>{ b.onclick = ()=>{ state.news = state.news.filter(n=>n.id!==b.dataset.delNews); log(u.name,'حذف إعلانًا.'); persist(); render(); }; });
+
+  // MINISTRY sub nav
+  document.querySelectorAll('[data-ministry]').forEach(b=>{ b.onclick = ()=>{ ui.ministrySub = b.dataset.ministry; render(); }; });
+
+  // ATTENDANCE
+  document.querySelectorAll('[data-cls]').forEach(b=>{ b.onclick = ()=>{ ui.adminAttClassroom = b.dataset.cls; render(); }; });
+  document.querySelectorAll('[data-att]').forEach(b=>{
+    b.onclick = ()=>{
+      const memberId = b.dataset.att, field = b.dataset.field, date = todayStr();
+      let rec = state.attendance.find(a=>a.memberId===memberId && a.date===date);
+      if(!rec){ rec = { id:uid('att'), memberId, classroomId: ui.adminAttClassroom, date, quddas:false, ijtimaa:false, markedBy:u.id }; state.attendance.push(rec); }
+      const wasOn = rec[field];
+      rec[field] = !rec[field]; rec.markedBy = u.id;
+      const m = state.users.find(x=>x.id===memberId);
+      const ptsVal = field==='quddas' ? state.settings.pointsQuddas : state.settings.pointsIjtimaa;
+      if(m){ awardPoints(m, wasOn ? -ptsVal : ptsVal, (field==='quddas'?'حضور القداس':'حضور الاجتماع'), u.name); }
+      log(u.name, `سجّل حضور ${m?m.name:''} (${field==='quddas'?'القداس':'الاجتماع'}: ${rec[field]?'حاضر':'غير حاضر'})`);
+      persist(); render();
+    };
+  });
+  const openScanBtn = document.getElementById('openScanBtn');
+  if(openScanBtn) openScanBtn.onclick = ()=>{ ui.scanning = true; render(); };
+  const closeScanBtn = document.getElementById('closeScanBtn');
+  if(closeScanBtn) closeScanBtn.onclick = ()=>{ stopScanner(); render(); };
+
+  // ASSIGNMENTS
+  const addAsgBtn = document.getElementById('addAssignmentBtn');
+  if(addAsgBtn) addAsgBtn.onclick = ()=>{
+    const title = document.getElementById('asg_title').value.trim();
+    if(!title){ showToast('أدخل عنوان التكليف.'); return; }
+    const points = parseInt(document.getElementById('asg_points').value,10) || 0;
+    const clsId = document.getElementById('asg_cls').value || null;
+    state.assignments.push({ id:uid('asg'), title, description: document.getElementById('asg_desc').value.trim(), points, classroomId: clsId, createdBy:u.id, createdAt: nowISO(), completions:{} });
+    log(u.name, `أضاف تكليفًا جديدًا: "${title}"`); persist(); render();
+  };
+  document.querySelectorAll('[data-del-asg]').forEach(b=>{ b.onclick = ()=>{ state.assignments = state.assignments.filter(a=>a.id!==b.dataset.delAsg); log(u.name,'حذف تكليفًا.'); persist(); render(); }; });
+  document.querySelectorAll('[data-asg-points]').forEach(inp=>{
+    inp.onchange = ()=>{ const a = state.assignments.find(x=>x.id===inp.dataset.asgPoints); a.points = parseInt(inp.value,10)||0; log(u.name, `غيّر قيمة نقاط "${a.title}" إلى ${a.points}.`); persist(); render(); };
+  });
+  document.querySelectorAll('[data-asg-check]').forEach(chk=>{
+    chk.onchange = ()=>{
+      const [asgId, memberId] = chk.dataset.asgCheck.split('|');
+      const a = state.assignments.find(x=>x.id===asgId); const m = state.users.find(x=>x.id===memberId);
+      if(chk.checked){ a.completions[memberId] = nowISO(); awardPoints(m, a.points, `إنجاز تكليف: ${a.title}`, u.name); log(u.name, `اعتمد إنجاز ${m.name} لتكليف "${a.title}" (+${a.points} نقطة).`); }
+      else { delete a.completions[memberId]; awardPoints(m, -a.points, `إلغاء تكليف: ${a.title}`, u.name); log(u.name, `ألغى إنجاز ${m.name} لتكليف "${a.title}".`); }
+      persist(); render();
+    };
+  });
+
+  // POINTS
+  const savePtsSettings = document.getElementById('savePointsSettings');
+  if(savePtsSettings) savePtsSettings.onclick = ()=>{
+    state.settings.pointsQuddas = parseInt(document.getElementById('pts_quddas').value,10)||0;
+    state.settings.pointsIjtimaa = parseInt(document.getElementById('pts_ijtimaa').value,10)||0;
+    log(u.name, 'عدّل قيم نقاط الحضور الافتراضية.'); persist(); showToast('تم حفظ الإعدادات.'); render();
+  };
+  document.querySelectorAll('[data-pts-adj]').forEach(b=>{
+    b.onclick = ()=>{
+      const [memberId, delta] = b.dataset.ptsAdj.split('|');
+      const m = state.users.find(x=>x.id===memberId);
+      awardPoints(m, parseInt(delta,10), 'تعديل يدوي', u.name);
+      log(u.name, `عدّل نقاط ${m.name} (${delta>0?'+':''}${delta}).`);
+      persist(); render();
+    };
+  });
+
+  // CHAT
+  const newChatBtn = document.getElementById('newChatBtn');
+  if(newChatBtn) newChatBtn.onclick = ()=>{ const chat = { id:uid('chat'), memberId:u.id, memberName:u.name, status:'unclaimed', claimedById:null, claimedByName:null, messages:[], createdAt: nowISO() }; state.chats.push(chat); ui.openChatId = chat.id; persist(); render(); };
+  document.querySelectorAll('[data-claim]').forEach(b=>{ b.onclick = ()=>{ const chat = state.chats.find(c=>c.id===b.dataset.claim); chat.status='claimed'; chat.claimedById=u.id; chat.claimedByName=u.name; log(u.name, `استلم محادثة مع ${chat.memberName}.`); ui.openChatId = chat.id; persist(); render(); }; });
+  document.querySelectorAll('[data-openchat]').forEach(b=>{ b.onclick = ()=>{ ui.openChatId = b.dataset.openchat; render(); }; });
+  const backBtn = document.getElementById('backToChatList'); if(backBtn) backBtn.onclick = ()=>{ ui.openChatId=null; render(); };
+  const closeChatBtn = document.getElementById('closeChatBtn');
+  if(closeChatBtn) closeChatBtn.onclick = ()=>{ const chat = state.chats.find(c=>c.id===ui.openChatId); chat.status='closed'; log(u.name, `أنهى المحادثة مع ${chat.memberName}.`); ui.openChatId=null; persist(); render(); };
+  const sendBtn = document.getElementById('sendChatBtn');
+  if(sendBtn) sendBtn.onclick = ()=>{
+    const input = document.getElementById('chatInput'); const text = input.value.trim(); if(!text) return;
+    const chat = state.chats.find(c=>c.id===ui.openChatId); const isMember = u.role==='makhdoum';
+    chat.messages.push({ sender: isMember?'member':'admin', senderName:u.name, senderId:u.id, text, time: nowISO() });
+    persist(); render();
+    setTimeout(()=>{ const el=document.querySelector('.thread-msgs'); if(el) el.scrollTop = el.scrollHeight; },0);
+  };
+
+  // ADMIN
+  document.querySelectorAll('[data-adminsub]').forEach(b=>{ b.onclick = ()=>{ ui.adminSub = b.dataset.adminsub; render(); }; });
+  document.querySelectorAll('[data-approve]').forEach(b=>{ b.onclick = ()=>{ const p = state.users.find(x=>x.id===b.dataset.approve); p.status='approved'; log(u.name, `وافق على انضمام ${p.name}.`); persist(); render(); }; });
+  document.querySelectorAll('[data-reject]').forEach(b=>{ b.onclick = ()=>{ const p = state.users.find(x=>x.id===b.dataset.reject); p.status='rejected'; log(u.name, `رفض طلب انضمام ${p.name}.`); persist(); render(); }; });
+  const addClassroomBtn = document.getElementById('addClassroomBtn');
+  if(addClassroomBtn) addClassroomBtn.onclick = ()=>{
+    const name = document.getElementById('newClassName').value.trim();
+    if(!name){ showToast('أدخل اسم الفصل.'); return; }
+    state.classrooms.push({ id:uid('cls'), name, servantIds:[] });
+    log(u.name, `أضاف فصلًا جديدًا: "${name}".`); persist(); render();
+  };
+  document.querySelectorAll('[data-del-cls]').forEach(b=>{
+    b.onclick = ()=>{
+      const cid = b.dataset.delCls; const cls = classroomOf(cid);
+      askConfirm(`حذف "${cls.name}"؟ سيصبح أعضاؤه بدون فصل.`, ()=>{
+        state.classrooms = state.classrooms.filter(c=>c.id!==cid);
+        state.users.forEach(x=>{ if(x.classroomId===cid) x.classroomId=null; });
+        log(u.name, `حذف فصل "${cls.name}".`); persist(); render();
+      });
+    };
+  });
+  document.querySelectorAll('[data-cls-servant]').forEach(chk=>{
+    chk.onchange = ()=>{
+      const [clsId, khId] = chk.dataset.clsServant.split('|');
+      const c = classroomOf(clsId); const k = state.users.find(x=>x.id===khId);
+      if(chk.checked){ if(!c.servantIds.includes(khId)) c.servantIds.push(khId); log(u.name, `أضاف ${k.name} كخادم لفصل "${c.name}".`); }
+      else { c.servantIds = c.servantIds.filter(id=>id!==khId); log(u.name, `أزال ${k.name} من فصل "${c.name}".`); }
+      persist(); render();
+    };
+  });
+  document.querySelectorAll('[data-promote]').forEach(b=>{ b.onclick = ()=>{ const k = state.users.find(x=>x.id===b.dataset.promote); k.role='senior_admin'; k.classroomId=null; log(u.name, `رقّى ${k.name} إلى إداري عام.`); persist(); render(); }; });
+  document.querySelectorAll('[data-promotekh]').forEach(b=>{ b.onclick = ()=>{ const m = state.users.find(x=>x.id===b.dataset.promotekh); m.role='khadim'; m.classroomId=null; log(u.name, `رقّى ${m.name} إلى خادم.`); persist(); render(); }; });
+  document.querySelectorAll('[data-ban-user]').forEach(b=>{
+    b.onclick = ()=>{
+      const target = state.users.find(x=>x.id===b.dataset.banUser);
+      if(target.role==='senior_admin' && state.users.filter(x=>x.role==='senior_admin'&&x.status==='approved').length<=1){ showToast('لا يمكن حظر الإداري العام الوحيد المتبقي.'); return; }
+      askConfirm(`حظر حساب "${target.name}"؟ لن يتمكن من الدخول حتى تُلغي الحظر.`, ()=>{
+        target.status='banned';
+        if(state.session.userId===target.id) state.session.userId=null;
+        log(u.name, `حظر حساب ${target.name}.`); persist(); render();
+      });
+    };
+  });
+  document.querySelectorAll('[data-unban-user]').forEach(b=>{
+    b.onclick = ()=>{
+      const target = state.users.find(x=>x.id===b.dataset.unbanUser);
+      target.status='approved';
+      log(u.name, `ألغى حظر حساب ${target.name}.`); persist(); render();
+    };
+  });
+  document.querySelectorAll('[data-delete-user]').forEach(b=>{
+    b.onclick = ()=>{
+      const target = state.users.find(x=>x.id===b.dataset.deleteUser);
+      if(target.role==='senior_admin' && state.users.filter(x=>x.role==='senior_admin'&&x.status==='approved').length<=1){ showToast('لا يمكن حذف الإداري العام الوحيد المتبقي.'); return; }
+      askConfirm(`حذف حساب "${target.name}" نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.`, ()=>{
+        state.users = state.users.filter(x=>x.id!==target.id);
+        state.classrooms.forEach(c=>{ c.servantIds = c.servantIds.filter(id=>id!==target.id); });
+        if(state.session.userId===target.id) state.session.userId=null;
+        log(u.name, `حذف حساب ${target.name} نهائيًا.`); persist(); render();
+      });
+    };
+  });
+}
+
+render();
+// Pull the latest shared state from the database once at startup, then keep polling
+// periodically so changes made by other people/devices show up here too.
+initialSync();
+setInterval(()=>{ if(currentUser() && !ui.scanning) render(); }, 30000);
+setInterval(()=>{ if(!ui.scanning) pollRemoteState(); }, 8000);
+</script>
+</body>
+</html>
