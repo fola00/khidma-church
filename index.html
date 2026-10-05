@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <title>خِدمة — تطبيق مجتمع الكنيسة</title>
+<meta name="theme-color" content="#5A2A27">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="خِدمة">
+<link rel="apple-touch-icon" id="appleTouchIcon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -695,6 +701,7 @@ function renderChurchGate(){
       <button class="btn btn-primary" id="dirSubmitBtn">دخول</button>
       <div style="text-align:center;margin-top:16px;"><button class="btn-ghost" id="toChurchGate" type="button">رجوع لتسجيل الدخول بكود الكنيسة</button></div>
     `}
+    <div style="text-align:center;margin-top:10px;"><button class="btn-outline btn-sm install-app-btn" onclick="triggerInstall()">📲 تثبيت التطبيق على الشاشة الرئيسية</button></div>
   </div>`;
 }
 function bindChurchGateEvents(){
@@ -1055,6 +1062,10 @@ function renderSettings(u){
       <div id="settingsProfileError" class="muted" style="color:var(--bad);display:none;margin-bottom:8px;"></div>
       <button class="btn btn-gold" id="saveProfileBtn">حفظ التعديلات</button>
       <p class="muted" style="margin-top:8px;">الدور: ${roleLabel(u.role)}${cls ? ' · الفصل: '+escapeHtml(cls.name) : ''}</p>
+    </div>
+
+    <div class="card tight" style="text-align:center;">
+      <button class="btn btn-teal install-app-btn" onclick="triggerInstall()">📲 تثبيت التطبيق على الشاشة الرئيسية</button>
     </div>
 
     <div class="card">
@@ -2035,6 +2046,49 @@ render();
 initialSync();
 setInterval(()=>{ if(currentUser() && !ui.scanning) render(); }, 30000);
 setInterval(()=>{ if(!ui.scanning) pollRemoteState(); }, 8000);
+
+/* ---------------- PWA: make the app installable to the home screen ---------------- */
+let deferredInstallPrompt = null;
+(function setupPWA(){
+  try{
+    const iconSvg = crestSVG(512).replace('viewBox="0 0 64 64"', 'viewBox="0 0 64 64" style="background:#5A2A27"');
+    const iconDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
+    const manifest = {
+      name: 'خِدمة — تطبيق مجتمع الكنيسة', short_name: 'خِدمة', start_url: './', scope: './',
+      display: 'standalone', background_color: '#FBF6EE', theme_color: '#5A2A27', dir: 'rtl', lang: 'ar',
+      icons: [
+        { src: iconDataUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
+        { src: iconDataUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
+      ],
+    };
+    const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+    const link = document.createElement('link'); link.rel = 'manifest'; link.href = manifestUrl;
+    document.head.appendChild(link);
+    const appleIcon = document.getElementById('appleTouchIcon'); if(appleIcon) appleIcon.href = iconDataUrl;
+  }catch(e){ console.warn('PWA manifest setup failed:', e); }
+
+  if('serviceWorker' in navigator){
+    try{
+      const swCode = `self.addEventListener('install', e=>self.skipWaiting()); self.addEventListener('activate', e=>self.clients.claim());`;
+      const swUrl = URL.createObjectURL(new Blob([swCode], { type: 'application/javascript' }));
+      navigator.serviceWorker.register(swUrl).catch(e=>console.warn('Service worker registration failed:', e));
+    }catch(e){ console.warn('Service worker setup failed:', e); }
+  }
+})();
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+window.addEventListener('appinstalled', ()=>{ deferredInstallPrompt = null; showToast('تم تثبيت التطبيق بنجاح ✓'); render(); });
+async function triggerInstall(){
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+  } else {
+    showToast('لتثبيت التطبيق: افتح قائمة المتصفح واختر "إضافة إلى الشاشة الرئيسية".');
+  }
+}
 </script>
 </body>
 </html>
