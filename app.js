@@ -561,13 +561,45 @@ function renderDirector(){
         <div class="d-flex justify-content-between align-items-center"><b>${escapeHtml(c.name)}</b><span class="badge rounded-pill badge-gold" style="letter-spacing:2px;">${escapeHtml(c.code)}</span></div>
         <div class="muted" style="margin-top:4px;">أُنشئت: ${new Date(c.createdAt).toLocaleDateString('ar-EG')}</div>
         ${c.synced===false ? `<div class="muted" style="color:var(--bad);margin-top:6px;">⚠ لم يتم حفظها على الإنترنت بعد.</div><button class="btn-ghost" data-retry-sync="${c.code}">إعادة محاولة الحفظ</button>` : ''}
+        <div class="d-flex justify-content-end"><button class="btn-ghost" data-del-church="${c.code}" style="color:var(--bad);">🗑 حذف الكنيسة</button></div>
       </div>`).join('')}
+  ${ui.confirm ? `<div class="confirm-overlay"><div class="confirm-box"><p>${escapeHtml(ui.confirm.message)}</p><div class="d-flex gap-2 equal-cols"><button class="btn btn-outline btn-sm" id="confirmNo" style="flex:1;">إلغاء</button><button class="btn btn-danger btn-sm" id="confirmYes" style="flex:1;">تأكيد الحذف</button></div></div></div>` : ''}
   </div>`;
+}
+async function deleteRemoteChurch(code){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?code=eq.${encodeURIComponent(code)}`, { method:'DELETE', headers: SUPA_HEADERS });
+    if(res.ok) return { ok:true };
+    let detail=''; try{ const j=await res.json(); detail=j.message||j.hint||''; }catch(e){}
+    lastSaveError = `خطأ من قاعدة البيانات (${res.status})${detail?': '+detail:''}`;
+    return { ok:false };
+  }catch(e){
+    lastSaveError = 'لا يوجد اتصال بالإنترنت (أو الاتصال محجوب).';
+    return { ok:false };
+  }
 }
 async function saveDirectorData(){
   return await createRemoteChurch(DIRECTOR_CODE, { churches: directorChurches.map(({pendingState, ...c})=>c), globalNews: directorGlobalNews });
 }
 function bindDirectorEvents(){
+  const confirmYes = document.getElementById('confirmYes');
+  if(confirmYes) confirmYes.onclick = ()=>{ const action = ui.confirm && ui.confirm.onYes; ui.confirm = null; if(action) action(); else render(); };
+  const confirmNo = document.getElementById('confirmNo');
+  if(confirmNo) confirmNo.onclick = ()=>{ ui.confirm = null; render(); };
+  document.querySelectorAll('[data-del-church]').forEach(b=>{
+    b.onclick = ()=>{
+      const code = b.dataset.delChurch;
+      const entry = directorChurches.find(c=>c.code===code);
+      askConfirm(`حذف كنيسة "${entry.name}" (${code}) نهائيًا؟ سيتم مسح كل أعضائها وبياناتها ولا يمكن التراجع.`, async ()=>{
+        const r = await deleteRemoteChurch(code);
+        if(!r.ok){ showToast('لم يتم الحذف. '+lastSaveError); render(); return; }
+        directorChurches = directorChurches.filter(c=>c.code!==code);
+        const s = await saveDirectorData();
+        showToast(s.ok ? 'تم حذف الكنيسة.' : 'حُذفت بياناتها لكن تعذّر تحديث القائمة. '+lastSaveError);
+        render();
+      });
+    };
+  });
   const logout = document.getElementById('dirLogoutBtn'); if(logout) logout.onclick = ()=>{ directorSession=false; ui.showDirectorLogin=false; render(); };
   const sendNewsBtn = document.getElementById('dirSendNewsBtn');
   if(sendNewsBtn) sendNewsBtn.onclick = async ()=>{
