@@ -3,6 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
+const APP_VERSION = 'v4 · delete churches';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 const DIRECTOR_CODE = '__director__';
@@ -476,6 +477,7 @@ function renderChurchGate(){
       <div class="text-center" style="margin-top:16px;"><button class="btn-ghost" id="toChurchGate" type="button">رجوع لتسجيل الدخول بكود الكنيسة</button></div>
     `}
     <div class="text-center" style="margin-top:10px;"><button class="btn btn-outline btn-sm install-app-btn" onclick="triggerInstall()">📲 تثبيت التطبيق على الشاشة الرئيسية</button></div>
+    <div class="text-center muted" style="margin-top:14px;font-size:11px;">الإصدار ${APP_VERSION}</div>
   </div>`;
 }
 function bindChurchGateEvents(){
@@ -691,6 +693,7 @@ function renderAuth(){
     </div>
     ${tab==='login' ? renderLoginForm() : renderSignupForm()}
     <div class="text-center" style="margin-top:10px;"><button class="btn-ghost" id="leaveChurchBtn" type="button" style="font-size:11.5px;color:var(--text-soft);">كود كنيسة مختلف؟</button></div>
+    <div class="text-center muted" style="margin-top:8px;font-size:11px;">الإصدار ${APP_VERSION}</div>
   </div>`;
 }
 function renderLoginForm(){
