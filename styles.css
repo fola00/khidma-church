@@ -136,12 +136,16 @@
     background-image:linear-gradient(180deg,#C24C4C,var(--bad));
     box-shadow:0 3px 10px rgba(178,58,58,.3);
   }
+  /* .btn-ghost is mostly used on its own (without .btn), so it must style itself fully */
   .btn-ghost{
     --bs-btn-color:var(--teal);--bs-btn-hover-color:var(--teal);--bs-btn-active-color:var(--teal);
     --bs-btn-bg:transparent;--bs-btn-hover-bg:transparent;--bs-btn-active-bg:rgba(31,111,107,.1);
     --bs-btn-border-color:transparent;--bs-btn-hover-border-color:transparent;--bs-btn-active-border-color:transparent;
-    text-decoration:none;padding:6px 4px;width:auto;font-weight:700;border-radius:8px;
+    background:transparent;color:var(--teal);border:none;cursor:pointer;
+    text-decoration:none;padding:6px 4px;width:auto;font-weight:700;font-size:inherit;border-radius:8px;
   }
+  .btn-ghost:hover,.btn-ghost:focus{background:transparent;color:var(--teal);}
+  .btn-ghost:active{background:rgba(31,111,107,.1);}
   .btn-sm{padding:8px 14px;font-size:12.5px;width:auto;}
   .btn[disabled]{opacity:.45;cursor:not-allowed;}
 

@@ -475,7 +475,7 @@ function renderChurchGate(){
       <button class="btn btn-primary" id="dirSubmitBtn">دخول</button>
       <div class="text-center" style="margin-top:16px;"><button class="btn-ghost" id="toChurchGate" type="button">رجوع لتسجيل الدخول بكود الكنيسة</button></div>
     `}
-    <div class="text-center" style="margin-top:10px;"><button class="btn-outline btn-sm install-app-btn" onclick="triggerInstall()">📲 تثبيت التطبيق على الشاشة الرئيسية</button></div>
+    <div class="text-center" style="margin-top:10px;"><button class="btn btn-outline btn-sm install-app-btn" onclick="triggerInstall()">📲 تثبيت التطبيق على الشاشة الرئيسية</button></div>
   </div>`;
 }
 function bindChurchGateEvents(){
