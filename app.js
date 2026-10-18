@@ -3,7 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v4 · delete churches';
+const APP_VERSION = 'v6 · readable chat colors';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 const DIRECTOR_CODE = '__director__';
@@ -58,33 +58,110 @@ async function createRemoteChurch(code, s){
   }
 }
 let lastSaveError = '';
+/* ---- sync: the login session stays on THIS device; pushes are merged with the server and never dropped ---- */
+let baseState = null;      // last state known to match the server (used for 3-way merge)
+let dirty = false;         // local changes not yet confirmed on the server
+let pushQueued = false;
+const clone = o => JSON.parse(JSON.stringify(o));
+const sameJSON = (a,b)=> JSON.stringify(a)===JSON.stringify(b);
+const isDemo = ()=> churchCode === 'DEMO';
+function adoptRemote(data, updatedAt){
+  const keep = (state && state.session) ? state.session : { userId:null };
+  state = data;
+  if(!state.stages) state.stages = [];
+  state.session = keep;            // never take someone else's login from the server
+  lastSyncedAt = updatedAt;
+  baseState = clone(state);
+  saveState(state);
+}
+function mergeChat(b, l, r){
+  const noMsgs = c=>{ const {messages, ...rest} = c || {}; return rest; };
+  const seen = new Set(), msgs = [];
+  [...(r.messages||[]), ...(l.messages||[])].forEach(m=>{
+    const k = m.time+'|'+m.sender+'|'+m.text;
+    if(!seen.has(k)){ seen.add(k); msgs.push(m); }
+  });
+  msgs.sort((x,y)=> new Date(x.time)-new Date(y.time));
+  const side = (b && sameJSON(noMsgs(l), noMsgs(b))) ? r : l;   // whoever changed status/claim wins
+  return { ...side, messages: msgs };
+}
+function mergeById(base, local, remote, both){
+  const B = new Map((base||[]).map(x=>[x.id,x])), L = new Map((local||[]).map(x=>[x.id,x])), R = new Map((remote||[]).map(x=>[x.id,x]));
+  const out = [];
+  for(const id of new Set([...R.keys(), ...L.keys()])){
+    const l = L.get(id), r = R.get(id), b = B.get(id);
+    if(l && r) out.push(both ? both(b,l,r) : (b && sameJSON(l,b) ? r : l));
+    else if(l && !r){ if(!b) out.push(l); }      // new here (if it was in base, it was deleted elsewhere)
+    else if(r && !l){ if(!b) out.push(r); }      // new elsewhere (if it was in base, we deleted it)
+  }
+  return out;
+}
+function mergeStates(base, local, remote){
+  const out = { ...remote };
+  ['users','classrooms','stages','sectors','attendance','assignments','news','chats','pointsLog','auditLog'].forEach(k=>{
+    if(local[k] || remote[k]) out[k] = mergeById(base && base[k], local[k], remote[k], k==='chats' ? mergeChat : null);
+  });
+  ['settings','emergency'].forEach(k=>{ out[k] = (base && sameJSON(local[k], base[k])) ? remote[k] : local[k]; });
+  out.auditLog = (out.auditLog||[]).sort((a,b)=> new Date(b.time)-new Date(a.time)).slice(0,80);
+  out.pointsLog = (out.pointsLog||[]).sort((a,b)=> new Date(b.time)-new Date(a.time)).slice(0,150);
+  out.session = local.session;
+  return out;
+}
+async function flushPush(){
+  if(!churchCode || directorSession || isDemo()) return;
+  if(syncing){ pushQueued = true; return; }
+  syncing = true;
+  let replaced = false;
+  try{
+    do{
+      pushQueued = false;
+      const url = `${SUPABASE_URL}/rest/v1/app_state?code=eq.${encodeURIComponent(churchCode)}`;
+      const get = await fetch(url+'&select=data,updated_at', { headers: SUPA_HEADERS });
+      if(!get.ok) throw new Error('read '+get.status);
+      const rows = await get.json();
+      const remote = rows && rows[0] && rows[0].data;
+      let toPush = state;
+      if(remote && Array.isArray(remote.users) && remote.users.length) toPush = mergeStates(baseState, state, remote);
+      const nowIso = new Date().toISOString();
+      const res = await fetch(url, { method:'PATCH', headers:{...SUPA_HEADERS,'Prefer':'return=minimal'},
+        body: JSON.stringify({ data: { ...toPush, session:{userId:null} }, updated_at: nowIso }) });
+      if(!res.ok) throw new Error('write '+res.status);
+      lastSyncedAt = nowIso;
+      baseState = clone(toPush);
+      if(toPush !== state && !pushQueued && !sameJSON({...toPush,session:0}, {...state,session:0})){
+        const keep = state.session; state = toPush; state.session = keep; saveState(state); replaced = true;
+      }
+      if(!pushQueued) dirty = false;
+    } while(pushQueued);
+  }catch(e){ console.warn('Supabase push failed (will retry):', e); }
+  finally{ syncing = false; }
+  if(replaced) render();
+}
 // Poll for changes made by other people/devices, and merge them in.
 async function pollRemoteState(){
-  if(!churchCode || directorSession) return;
+  if(!churchCode || directorSession || isDemo()) return;
   fetchGlobalNews(); // fire-and-forget; refreshes globalNewsCache for the next render
+  if(dirty || syncing){ flushPush(); return; }
   const row = await fetchRemoteState(churchCode);
+  if(dirty || syncing) return;   // something changed locally while we were fetching
   if(!row || !row.data || !Array.isArray(row.data.users) || !row.data.users.length) return;
-  if(row.updated_at !== lastSyncedAt){
-    lastSyncedAt = row.updated_at;
-    state = row.data;
-    saveState(state); // keep local cache warm too
+  if(!lastSyncedAt || Date.parse(row.updated_at) !== Date.parse(lastSyncedAt)){
+    adoptRemote(row.data, row.updated_at);
     render();
   }
 }
 // Run once at startup: if this church's row already has data, adopt it (so every
 // device converges on the same data instead of each keeping its own demo copy).
 async function initialSync(){
-  if(!churchCode) return;
+  if(!churchCode || isDemo()) return;
   fetchGlobalNews();
   const row = await fetchRemoteState(churchCode);
   if(row && row.data && Array.isArray(row.data.users) && row.data.users.length){
-    lastSyncedAt = row.updated_at;
-    state = row.data;
-    saveState(state);
+    adoptRemote(row.data, row.updated_at);
     render();
   } else {
-    const res = await createRemoteChurch(churchCode, state);
-    lastSyncedAt = res.updatedAt;
+    const res = await createRemoteChurch(churchCode, { ...state, session:{userId:null} });
+    lastSyncedAt = res.updatedAt; baseState = clone(state);
   }
 }
 
@@ -229,7 +306,7 @@ let ui = { authTab:'login', activeTab:'news', openChatId:null,
            gateCode:'', gateError:'', gateBusy:false, showDirectorLogin:false, directorError:'',
            dirNewName:'', dirNewAdminName:'', dirNewAdminEmail:'', dirNewAdminPass:'', resetPwFor:null };
 
-function persist(){ saveState(state); if(churchCode && !directorSession) pushRemoteState(churchCode, state); }
+function persist(){ saveState(state); if(churchCode && !directorSession && !isDemo()){ dirty = true; flushPush(); } }
 function log(actor, action){
   state.auditLog.unshift({ id:uid('log'), time: nowISO(), actor, action });
   state.auditLog = state.auditLog.slice(0,80);
@@ -441,6 +518,8 @@ function generateQRSvg(text){
 function render(){
   checkEmergencyExpiry();
   const root = document.getElementById('root');
+  const chatEl = document.getElementById('chatInput');
+  const typed = chatEl ? chatEl.value : null, hadFocus = chatEl && document.activeElement === chatEl;
 
   if(directorSession){ root.innerHTML = renderDirector(); bindDirectorEvents(); return; }
   if(!churchCode){ root.innerHTML = renderChurchGate(); bindChurchGateEvents(); return; }
@@ -453,6 +532,7 @@ function render(){
 
   root.innerHTML = renderApp(u);
   bindAppEvents(u);
+  if(typed){ const el = document.getElementById('chatInput'); if(el){ el.value = typed; if(hadFocus) el.focus(); } }
   if(ui.scanning) startScanner();
 }
 
@@ -505,10 +585,8 @@ function bindChurchGateEvents(){
     }
     churchCode = code;
     localStorage.setItem(CHURCH_CODE_KEY, code);
-    lastSyncedAt = row.updated_at;
-    state = row.data;
-    if(!state.stages) state.stages = [];
-    saveState(state);
+    state = emptyShellState();
+    adoptRemote(row.data, row.updated_at);
     render();
   };
   const dirBtn = document.getElementById('dirSubmitBtn');
@@ -1039,10 +1117,39 @@ function renderAttendanceAdmin(u){
     `}`;
 }
 
+/* ---------------- ASSIGNMENT PDF FILES (Supabase Storage bucket "assignment-files") ---------------- */
+const ASG_BUCKET = 'assignment-files';
+const STORAGE_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY };
+function validatePdf(file){
+  if(!file) return null;
+  if(!(file.type==='application/pdf' || /\.pdf$/i.test(file.name))) return 'الملف لازم يكون PDF.';
+  if(file.size > 10*1024*1024) return 'حجم الملف أكبر من ١٠ ميجا.';
+  return null;
+}
+async function uploadAssignmentPdf(file){
+  const key = uid('f') + '.pdf';
+  let res;
+  try{
+    res = await fetch(`${SUPABASE_URL}/storage/v1/object/${ASG_BUCKET}/${key}`, {
+      method:'POST', headers:{ ...STORAGE_HEADERS, 'Content-Type':'application/pdf' }, body:file });
+  }catch(e){ throw new Error('لا يوجد اتصال بالإنترنت.'); }
+  if(!res.ok){
+    let d=''; try{ const j = await res.json(); d = j.message || j.error || ''; }catch(e){}
+    throw new Error(`فشل رفع الملف (${res.status})${d ? ': '+d : ''} — تأكد من تشغيل ملف SQL الخاص بالملفات.`);
+  }
+  return { name:file.name, size:file.size, key, url:`${SUPABASE_URL}/storage/v1/object/public/${ASG_BUCKET}/${key}` };
+}
+async function deleteAssignmentPdf(f){
+  if(!f || !f.key) return;
+  try{ await fetch(`${SUPABASE_URL}/storage/v1/object/${ASG_BUCKET}/${f.key}`, { method:'DELETE', headers: STORAGE_HEADERS }); }catch(e){}
+}
+function fileSizeLabel(n){ return n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+
 function renderAssignments(u){
   const canCreate = isAdminish(u);
   const editableClassrooms = myClassrooms(u);
-  const list = u.role==='senior_admin' ? state.assignments : state.assignments.filter(a=> !a.classroomId || editableClassrooms.some(c=>c.id===a.classroomId));
+  const visible = u.role==='senior_admin' ? state.assignments : state.assignments.filter(a=> !a.classroomId || editableClassrooms.some(c=>c.id===a.classroomId));
+  const list = visible.slice().sort((a,b)=> (b.pinned?1:0) - (a.pinned?1:0));   // pinned first, others keep their order
   return `
     ${canCreate ? `
     <div class="card p-3 mb-3">
@@ -1058,6 +1165,8 @@ function renderAssignments(u){
           </select>
         </div>
       </div>
+      <div class="mb-3"><label class="form-label">ملف PDF (اختياري)</label><input class="form-control" type="file" id="asg_file" accept="application/pdf,.pdf"></div>
+      <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="asg_pinned"><label class="form-check-label" for="asg_pinned">📌 تثبيت التكليف في الأعلى</label></div>
       <button class="btn btn-gold" id="addAssignmentBtn">إضافة التكليف</button>
     </div>` : ''}
     ${list.length===0 ? `<div class="empty"><div class="big">📋</div>لا توجد تكليفات بعد.</div>` :
@@ -1068,9 +1177,11 @@ function renderAssignments(u){
         return `
         <div class="card p-3 mb-3">
           <div class="d-flex justify-content-between align-items-start">
-            <div><b style="font-size:14.5px;">${escapeHtml(a.title)}</b><div class="muted">${escapeHtml(cls?cls.name:'كل الفصول')} · أنجزها ${doneCount}/${members.length}</div></div>
-            ${canCreate ? `<button class="btn-ghost" data-del-asg="${a.id}" style="color:var(--bad);">حذف</button>` : ''}
+            <div><b style="font-size:14.5px;">${a.pinned ? '📌 ' : ''}${escapeHtml(a.title)}</b><div class="muted">${escapeHtml(cls?cls.name:'كل الفصول')} · أنجزها ${doneCount}/${members.length}</div></div>
+            ${canCreate ? `<div class="d-flex gap-1"><button class="btn-ghost" data-pin-asg="${a.id}">${a.pinned ? 'إلغاء التثبيت' : '📌 تثبيت'}</button><button class="btn-ghost" data-del-asg="${a.id}" style="color:var(--bad);">حذف</button></div>` : ''}
           </div>
+          ${a.file ? `<div class="d-flex align-items-center gap-2" style="margin:8px 0;"><a href="${escapeHtml(a.file.url)}" target="_blank" rel="noopener" style="font-weight:700;color:var(--teal);word-break:break-all;">📎 ${escapeHtml(a.file.name)}</a><span class="muted">(${fileSizeLabel(a.file.size||0)})</span>${canCreate ? `<button class="btn-ghost" data-remove-file="${a.id}" style="color:var(--bad);">إزالة</button>` : ''}</div>` : ''}
+          ${canCreate ? `<div style="margin:4px 0;"><label class="btn-ghost" for="attach_${a.id}" style="cursor:pointer;">${a.file ? '🔄 استبدال ملف PDF' : '📎 إرفاق ملف PDF'}</label><input type="file" id="attach_${a.id}" data-attach-input="${a.id}" accept="application/pdf,.pdf" hidden></div>` : ''}
           ${a.description ? `<p class="muted" style="margin:6px 0;">${escapeHtml(a.description)}</p>` : ''}
           <div class="d-flex gap-2 equal-cols" style="align-items:center;margin:8px 0 10px;">
             <span class="muted">قيمة النقاط:</span>
@@ -1584,15 +1695,40 @@ function bindAppEvents(u){
 
   // ASSIGNMENTS
   const addAsgBtn = document.getElementById('addAssignmentBtn');
-  if(addAsgBtn) addAsgBtn.onclick = ()=>{
+  if(addAsgBtn) addAsgBtn.onclick = async ()=>{
     const title = document.getElementById('asg_title').value.trim();
     if(!title){ showToast('أدخل عنوان التكليف.'); return; }
     const points = parseInt(document.getElementById('asg_points').value,10) || 0;
     const clsId = document.getElementById('asg_cls').value || null;
-    state.assignments.push({ id:uid('asg'), title, description: document.getElementById('asg_desc').value.trim(), points, classroomId: clsId, createdBy:u.id, createdAt: nowISO(), completions:{} });
+    const desc = document.getElementById('asg_desc').value.trim();
+    const pinned = document.getElementById('asg_pinned').checked;
+    const file = document.getElementById('asg_file').files[0] || null;
+    const bad = validatePdf(file); if(bad){ showToast(bad); return; }
+    let fileInfo = null;
+    if(file){
+      addAsgBtn.disabled = true; addAsgBtn.textContent = 'جاري رفع الملف...';
+      try{ fileInfo = await uploadAssignmentPdf(file); }
+      catch(e){ showToast(e.message); addAsgBtn.disabled = false; addAsgBtn.textContent = 'إضافة التكليف'; return; }
+    }
+    state.assignments.push({ id:uid('asg'), title, description: desc, points, classroomId: clsId, createdBy:u.id, createdAt: nowISO(), completions:{}, pinned, file: fileInfo });
     log(u.name, `أضاف تكليفًا جديدًا: "${title}"`); persist(); render();
   };
-  document.querySelectorAll('[data-del-asg]').forEach(b=>{ b.onclick = ()=>{ state.assignments = state.assignments.filter(a=>a.id!==b.dataset.delAsg); log(u.name,'حذف تكليفًا.'); persist(); render(); }; });
+  document.querySelectorAll('[data-pin-asg]').forEach(b=>{ b.onclick = ()=>{ const a = state.assignments.find(x=>x.id===b.dataset.pinAsg); a.pinned = !a.pinned; log(u.name, `${a.pinned?'ثبّت':'ألغى تثبيت'} تكليف "${a.title}".`); persist(); render(); }; });
+  document.querySelectorAll('[data-attach-input]').forEach(inp=>{
+    inp.onchange = async ()=>{
+      const a = state.assignments.find(x=>x.id===inp.dataset.attachInput);
+      const file = inp.files[0]; const bad = validatePdf(file); if(bad){ showToast(bad); return; }
+      showToast('جاري رفع الملف...');
+      try{ const info = await uploadAssignmentPdf(file); await deleteAssignmentPdf(a.file); a.file = info; }
+      catch(e){ showToast(e.message); return; }
+      log(u.name, `أرفق ملف PDF بتكليف "${a.title}".`); persist(); render();
+    };
+  });
+  document.querySelectorAll('[data-remove-file]').forEach(b=>{
+    b.onclick = ()=>{ const a = state.assignments.find(x=>x.id===b.dataset.removeFile);
+      askConfirm('إزالة ملف الـPDF من هذا التكليف؟', async ()=>{ await deleteAssignmentPdf(a.file); a.file = null; log(u.name, `أزال ملف PDF من تكليف "${a.title}".`); persist(); render(); }); };
+  });
+  document.querySelectorAll('[data-del-asg]').forEach(b=>{ b.onclick = ()=>{ const a = state.assignments.find(x=>x.id===b.dataset.delAsg); if(a) deleteAssignmentPdf(a.file); state.assignments = state.assignments.filter(x=>x.id!==b.dataset.delAsg); log(u.name,'حذف تكليفًا.'); persist(); render(); }; });
   document.querySelectorAll('[data-asg-points]').forEach(inp=>{
     inp.onchange = ()=>{ const a = state.assignments.find(x=>x.id===inp.dataset.asgPoints); a.points = parseInt(inp.value,10)||0; log(u.name, `غيّر قيمة نقاط "${a.title}" إلى ${a.points}.`); persist(); render(); };
   });
