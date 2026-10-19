@@ -3,7 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v6 · readable chat colors';
+const APP_VERSION = 'v7 · exams';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 const DIRECTOR_CODE = '__director__';
@@ -69,6 +69,8 @@ function adoptRemote(data, updatedAt){
   const keep = (state && state.session) ? state.session : { userId:null };
   state = data;
   if(!state.stages) state.stages = [];
+  if(!state.exams) state.exams = [];
+  if(!state.examResponses) state.examResponses = [];
   state.session = keep;            // never take someone else's login from the server
   lastSyncedAt = updatedAt;
   baseState = clone(state);
@@ -98,7 +100,7 @@ function mergeById(base, local, remote, both){
 }
 function mergeStates(base, local, remote){
   const out = { ...remote };
-  ['users','classrooms','stages','sectors','attendance','assignments','news','chats','pointsLog','auditLog'].forEach(k=>{
+  ['users','classrooms','stages','sectors','attendance','assignments','exams','examResponses','news','chats','pointsLog','auditLog'].forEach(k=>{
     if(local[k] || remote[k]) out[k] = mergeById(base && base[k], local[k], remote[k], k==='chats' ? mergeChat : null);
   });
   ['settings','emergency'].forEach(k=>{ out[k] = (base && sameJSON(local[k], base[k])) ? remote[k] : local[k]; });
@@ -223,6 +225,7 @@ function seedState(){
         messages:[ {sender:'member', senderName:'مارينا سامح', text:'سلام أبونا، عايزة أستأذن غياب الأحد الجاي بسبب سفر.', time: nowISO()} ],
         createdAt: nowISO() },
     ],
+    exams: [], examResponses: [],
     settings: { pointsQuddas:5, pointsIjtimaa:5 },
     pointsLog: [],
     emergency: { active:false, byUserId:null, originalRole:null, grantedAt:null, log:[] },
@@ -247,6 +250,7 @@ function freshChurchState(adminName, adminEmail, adminPass){
     assignments: [],
     news: [],
     chats: [],
+    exams: [], examResponses: [],
     settings: { pointsQuddas:5, pointsIjtimaa:5 },
     pointsLog: [],
     emergency: { active:false, byUserId:null, originalRole:null, grantedAt:null, log:[] },
@@ -263,6 +267,8 @@ function loadState(code){
       if(!s.settings) s.settings = { pointsQuddas:5, pointsIjtimaa:5 };
       if(!s.pointsLog) s.pointsLog = [];
       if(!s.stages) s.stages = [];
+      if(!s.exams) s.exams = [];
+      if(!s.examResponses) s.examResponses = [];
       if(!s.sectors) s.sectors = [];
       s.classrooms.forEach(c=>{ if(!c.servantIds) c.servantIds = c.servantId ? [c.servantId] : []; if(c.stageId===undefined) c.stageId = null; });
       s.stages.forEach(st=>{ if(st.sectorId===undefined) st.sectorId = null; });
@@ -299,7 +305,7 @@ async function fetchGlobalNews(){
   }
 })();
 
-const emptyShellState = ()=>({ session:{userId:null}, users:[], sectors:[], stages:[], classrooms:[], attendance:[], assignments:[], news:[], chats:[], settings:{pointsQuddas:5,pointsIjtimaa:5}, pointsLog:[], emergency:{active:false,byUserId:null,originalRole:null,grantedAt:null,log:[]}, auditLog:[] });
+const emptyShellState = ()=>({ session:{userId:null}, users:[], sectors:[], stages:[], classrooms:[], attendance:[], assignments:[], exams:[], examResponses:[], news:[], chats:[], settings:{pointsQuddas:5,pointsIjtimaa:5}, pointsLog:[], emergency:{active:false,byUserId:null,originalRole:null,grantedAt:null,log:[]}, auditLog:[] });
 let state = churchCode ? (loadState(churchCode) || emptyShellState()) : emptyShellState();
 let ui = { authTab:'login', activeTab:'news', openChatId:null,
            adminAttClassroom:null, ministrySub:'attendance', adminSub:'pending', toast:null, scanning:false, confirm:null,
@@ -520,6 +526,9 @@ function render(){
   const root = document.getElementById('root');
   const chatEl = document.getElementById('chatInput');
   const typed = chatEl ? chatEl.value : null, hadFocus = chatEl && document.activeElement === chatEl;
+  const ae = document.activeElement;
+  const fkey = (ae && ae !== document.body) ? ((ae.dataset && ae.dataset.fkey) || null) : null;
+  const selS = fkey ? ae.selectionStart : null, selE = fkey ? ae.selectionEnd : null;
 
   if(directorSession){ root.innerHTML = renderDirector(); bindDirectorEvents(); return; }
   if(!churchCode){ root.innerHTML = renderChurchGate(); bindChurchGateEvents(); return; }
@@ -532,6 +541,7 @@ function render(){
 
   root.innerHTML = renderApp(u);
   bindAppEvents(u);
+  if(fkey){ const el = document.querySelector(`[data-fkey="${fkey}"]`); if(el){ el.focus(); try{ el.setSelectionRange(selS, selE); }catch(e){} } }
   if(typed){ const el = document.getElementById('chatInput'); if(el){ el.value = typed; if(hadFocus) el.focus(); } }
   if(ui.scanning) startScanner();
 }
@@ -1024,6 +1034,7 @@ function renderNews(u){
 
 /* ---------------- MINE (member: attendance + points + QR) ---------------- */
 function renderMine(u){
+  if(ui.takingExam && examOf(ui.takingExam)) return renderExamTake(u);
   const records = state.attendance.filter(a=>a.memberId===u.id).sort((a,b)=> b.date.localeCompare(a.date));
   const totalQ = records.filter(r=>r.quddas).length, totalI = records.filter(r=>r.ijtimaa).length;
   const cls = classroomOf(u.classroomId);
@@ -1054,6 +1065,16 @@ function renderMine(u){
         </div>`;
       }).join('')
     }
+    ${(()=>{
+      const myExams = state.exams.filter(e=> (!e.classroomId || e.classroomId===u.classroomId) && (e.status==='open' || responseOf(e.id,u.id)));
+      if(!myExams.length) return '';
+      return `<h3 style="font-size:13.5px;color:var(--text-soft);margin:16px 0 8px;">الامتحانات</h3>` + myExams.map(e=>{
+        const r = responseOf(e.id,u.id); const s = r ? scoreResponse(e,r) : null;
+        return `<div class="card px-3 py-2 mb-3 d-flex flex-row justify-content-between align-items-center gap-2">
+          <div><b style="font-size:13.5px;">📝 ${escapeHtml(e.title)}</b><div class="muted">${e.questions.length} سؤال</div></div>
+          ${r ? `<button class="btn btn-outline btn-sm" data-take-exam="${e.id}">${e.showScore && s.total ? '✓ '+s.got+'/'+s.total : '✓ تم التسليم'}</button>` : `<button class="btn btn-gold btn-sm" data-take-exam="${e.id}">ابدأ الامتحان</button>`}
+        </div>`;}).join('');
+    })()}
     <h3 style="font-size:13.5px;color:var(--text-soft);margin:16px 0 8px;">سجل الحضور</h3>
     ${records.length===0 ? `<div class="empty"><div class="big">🗒️</div>لا يوجد سجل حضور بعد.</div>` :
       `<div class="card p-3 mb-3"><ul class="plain">${records.map(r=>`
@@ -1065,6 +1086,323 @@ function renderMine(u){
           </span>
         </li>`).join('')}</ul></div>`}
   </div>`;
+}
+
+
+/* ---------------- EXAMS (like Google Forms) ---------------- */
+const QTYPES = { short:'إجابة قصيرة', paragraph:'فقرة', choice:'اختيار واحد', multi:'مربعات اختيار (أكثر من إجابة)', dropdown:'قائمة منسدلة' };
+const EXAM_STATUS = { draft:'مسودة', open:'مفتوح', closed:'مغلق' };
+const isChoiceType = t => t==='choice' || t==='multi' || t==='dropdown';
+function newQuestion(){ return { id:uid('q'), type:'choice', text:'', required:false, points:1, options:['الخيار ١','الخيار ٢'], correct:[] }; }
+function examOf(id){ return state.exams.find(e=>e.id===id); }
+function responseOf(examId, memberId){ return state.examResponses.find(r=>r.examId===examId && r.memberId===memberId); }
+function questionAutoPoints(q, ans){
+  if(!isChoiceType(q.type) || !q.correct.length) return null;           // not auto-graded
+  if(q.type==='multi'){
+    const a = Array.isArray(ans) ? ans.slice().sort() : [], c = q.correct.slice().sort();
+    return (a.length===c.length && a.every((v,i)=>v===c[i])) ? q.points : 0;
+  }
+  return (ans!==undefined && ans!==null && ans!=='' && q.correct.includes(Number(ans))) ? q.points : 0;
+}
+function scoreResponse(exam, resp){
+  let got = 0, total = 0, pending = 0;
+  exam.questions.forEach(q=>{
+    const auto = questionAutoPoints(q, resp.answers[q.id]);
+    if(auto!==null){ got += auto; total += q.points; }
+    else if(!isChoiceType(q.type) && q.points>0){
+      total += q.points;
+      if(resp.manual && resp.manual[q.id]!==undefined) got += resp.manual[q.id]; else pending++;
+    }
+  });
+  return { got, total, pending };
+}
+function answerText(q, ans){
+  if(isChoiceType(q.type) && q.type!=='multi') return (ans!==undefined && ans!=='' && q.options[ans]!==undefined) ? q.options[ans] : '—';
+  if(q.type==='multi') return (Array.isArray(ans) && ans.length) ? ans.map(i=>q.options[i]).filter(x=>x!==undefined).join('، ') : '—';
+  return (ans && String(ans).trim()) ? String(ans) : '—';
+}
+function examsVisibleTo(u){
+  const editable = myClassrooms(u);
+  return u.role==='senior_admin' ? state.exams : state.exams.filter(e=> !e.classroomId || editable.some(c=>c.id===e.classroomId));
+}
+
+function renderAssignments(u){
+  const sub = ui.asgSub || 'tasks';
+  return `
+  <div class="segmented" style="margin-bottom:12px;">
+    <button class="${sub==='tasks'?'active':''}" data-asgsub="tasks">التكليفات</button>
+    <button class="${sub==='exams'?'active':''}" data-asgsub="exams">📝 الامتحانات</button>
+  </div>
+  ${sub==='exams' ? renderExamsAdmin(u) : renderTasks(u)}`;
+}
+
+function renderExamsAdmin(u){
+  if(ui.examResults && examOf(ui.examResults)) return renderExamResults(u);
+  if(ui.editExam && examOf(ui.editExam)) return renderExamEditor(u);
+  const editable = u.role==='senior_admin' ? state.classrooms : myClassrooms(u);
+  const list = examsVisibleTo(u);
+  return `
+  <div class="card p-3 mb-3">
+    <b style="font-size:14px;">إنشاء امتحان جديد</b>
+    <div class="mb-3 mt-2"><input class="form-control" type="text" id="exam_title" placeholder="عنوان الامتحان"></div>
+    <div class="mb-3"><select class="form-select" id="exam_cls"><option value="">كل الفصول</option>${editable.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
+    <button class="btn btn-gold" id="addExamBtn">إنشاء وإضافة الأسئلة</button>
+  </div>
+  ${list.length===0 ? `<div class="empty"><div class="big">📝</div>لا توجد امتحانات بعد.</div>` : list.slice().reverse().map(e=>{
+    const cls = classroomOf(e.classroomId);
+    const count = state.examResponses.filter(r=>r.examId===e.id).length;
+    return `
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div><b style="font-size:14.5px;">${escapeHtml(e.title)}</b><div class="muted">${escapeHtml(cls?cls.name:'كل الفصول')} · ${e.questions.length} سؤال · ${count} إجابة</div></div>
+        <span class="badge rounded-pill ${e.status==='open'?'badge-ok':e.status==='closed'?'badge-bad':'badge-gold'}">${EXAM_STATUS[e.status]}</span>
+      </div>
+      <div class="d-flex flex-wrap gap-1 mt-2">
+        <button class="btn-ghost" data-edit-exam="${e.id}">✏️ تعديل</button>
+        <button class="btn-ghost" data-results-exam="${e.id}">📊 النتائج</button>
+        ${e.status==='open' ? `<button class="btn-ghost" data-exam-status="${e.id}|closed">⏹ إغلاق</button>` : `<button class="btn-ghost" data-exam-status="${e.id}|open">▶ نشر</button>`}
+        <button class="btn-ghost" data-del-exam="${e.id}" style="color:var(--bad);">🗑 حذف</button>
+      </div>
+    </div>`;}).join('')}`;
+}
+
+function renderQuestionEditor(e, q, i){
+  const choice = isChoiceType(q.type);
+  const kind = q.type==='multi' ? 'checkbox' : 'radio';
+  return `
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <b>سؤال ${i+1}</b>
+      <div class="d-flex gap-1">
+        <button class="btn-ghost" data-qmove="${q.id}|-1" ${i===0?'disabled':''}>▲</button>
+        <button class="btn-ghost" data-qmove="${q.id}|1" ${i===e.questions.length-1?'disabled':''}>▼</button>
+        <button class="btn-ghost" data-qdel="${q.id}" style="color:var(--bad);">🗑</button>
+      </div>
+    </div>
+    <div class="mb-3"><input class="form-control" type="text" data-qid="${q.id}" data-qf="text" data-fkey="${q.id}:text" placeholder="نص السؤال" value="${escapeHtml(q.text)}"></div>
+    <div class="mb-3"><select class="form-select" data-qid="${q.id}" data-qtype>${Object.entries(QTYPES).map(([k,v])=>`<option value="${k}" ${q.type===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    ${choice ? `
+    <div class="mb-3"><label class="form-label">الخيارات (خيار في كل سطر)</label><textarea class="form-control" rows="4" data-qid="${q.id}" data-qopts data-fkey="${q.id}:opts">${escapeHtml(q.options.join('\n'))}</textarea></div>
+    <div class="mb-3"><label class="form-label">الإجابة الصحيحة (اختياري — للتصحيح التلقائي)</label>
+      ${q.options.map((o,idx)=>`<div class="form-check"><input class="form-check-input" type="${kind}" name="c_${q.id}" id="c_${q.id}_${idx}" data-qid="${q.id}" data-qcorrect="${idx}" ${q.correct.includes(idx)?'checked':''}><label class="form-check-label" for="c_${q.id}_${idx}">${escapeHtml(o)}</label></div>`).join('')}
+    </div>` : `<div class="muted mb-3">${'الأسئلة الكتابية يصحّحها الخادم يدويًا من صفحة النتائج.'}</div>`}
+    <div class="d-flex gap-3 align-items-center flex-wrap">
+      <div class="form-check"><input class="form-check-input" type="checkbox" id="req_${q.id}" data-qid="${q.id}" data-qreq ${q.required?'checked':''}><label class="form-check-label" for="req_${q.id}">مطلوب</label></div>
+      <div class="d-flex align-items-center gap-2"><label class="form-label m-0">الدرجة</label><input class="form-control" type="number" min="0" style="width:84px;" data-qid="${q.id}" data-qf="points" data-fkey="${q.id}:pts" value="${q.points}"></div>
+    </div>
+  </div>`;
+}
+
+function renderExamEditor(u){
+  const e = examOf(ui.editExam);
+  const editable = u.role==='senior_admin' ? state.classrooms : myClassrooms(u);
+  return `
+  <button class="btn-ghost mb-2" data-exam-back>← رجوع للامتحانات</button>
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2"><b>إعدادات الامتحان</b><span class="badge rounded-pill ${e.status==='open'?'badge-ok':e.status==='closed'?'badge-bad':'badge-gold'}">${EXAM_STATUS[e.status]}</span></div>
+    <div class="mb-3"><input class="form-control" type="text" data-efield="title" data-fkey="e:title" placeholder="عنوان الامتحان" value="${escapeHtml(e.title)}"></div>
+    <div class="mb-3"><textarea class="form-control" rows="3" data-efield="description" data-fkey="e:desc" placeholder="وصف أو تعليمات (اختياري)">${escapeHtml(e.description||'')}</textarea></div>
+    <div class="mb-3"><select class="form-select" data-efield="classroomId"><option value="">كل الفصول</option>${editable.map(c=>`<option value="${c.id}" ${e.classroomId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
+    <div class="form-check"><input class="form-check-input" type="checkbox" id="exam_showscore" data-efield="showScore" ${e.showScore?'checked':''}><label class="form-check-label" for="exam_showscore">إظهار الدرجة للمخدوم بعد التسليم</label></div>
+  </div>
+  ${e.questions.map((q,i)=>renderQuestionEditor(e,q,i)).join('')}
+  <button class="btn btn-outline mb-3" data-addq>＋ إضافة سؤال</button>
+  ${e.status==='open'
+    ? `<button class="btn btn-danger" data-exam-status="${e.id}|closed">⏹ إغلاق الامتحان</button>`
+    : `<button class="btn btn-gold" data-exam-status="${e.id}|open">▶ نشر الامتحان للمخدومين</button>`}`;
+}
+
+function renderExamResults(u){
+  const e = examOf(ui.examResults);
+  const seen = new Set();
+  const resps = state.examResponses.filter(r=>r.examId===e.id && !seen.has(r.memberId) && seen.add(r.memberId));
+  const scored = resps.map(r=>({ r, s: scoreResponse(e, r) }));
+  const avg = scored.length && scored[0].s.total ? Math.round(scored.reduce((a,x)=>a+x.s.got,0)/scored.length*10)/10 : null;
+  return `
+  <button class="btn-ghost mb-2" data-exam-back>← رجوع للامتحانات</button>
+  <div class="card p-3 mb-3">
+    <b style="font-size:15px;">${escapeHtml(e.title)}</b>
+    <div class="muted">${resps.length} إجابة${avg!==null ? ` · المتوسط ${avg} من ${scored[0].s.total}` : ''}</div>
+  </div>
+  ${resps.length===0 ? `<div class="empty"><div class="big">📭</div>لا توجد إجابات بعد.</div>` : scored.map(({r,s})=>`
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <b>${escapeHtml(r.memberName)}</b>
+        <span class="badge rounded-pill ${s.pending?'badge-gold':'badge-ok'}">${s.got} / ${s.total}${s.pending?' · '+s.pending+' بانتظار التصحيح':''}</span>
+      </div>
+      <div class="muted mb-2">${fmtDate(r.submittedAt)}</div>
+      ${e.questions.map(q=>{
+        const ans = r.answers[q.id];
+        const auto = questionAutoPoints(q, ans);
+        const mark = auto===null ? '' : (auto>0 ? '<span style="color:var(--ok);">✓</span> ' : '<span style="color:var(--bad);">✗</span> ');
+        return `<div style="padding:8px 0;border-top:1px solid var(--line);">
+          <div style="font-weight:700;font-size:13.5px;">${escapeHtml(q.text||'(بدون عنوان)')}</div>
+          <div style="font-size:14px;">${mark}${escapeHtml(answerText(q,ans))}</div>
+          ${(!isChoiceType(q.type) && q.points>0) ? `<div class="d-flex align-items-center gap-2 mt-1"><span class="muted">الدرجة (من ${q.points}):</span><input class="form-control" type="number" min="0" max="${q.points}" style="width:84px;" data-manual="${r.id}|${q.id}" value="${r.manual && r.manual[q.id]!==undefined ? r.manual[q.id] : ''}"></div>` : ''}
+        </div>`;}).join('')}
+    </div>`).join('')}`;
+}
+
+/* ----- member side ----- */
+function renderExamTake(u){
+  const e = examOf(ui.takingExam);
+  const resp = responseOf(e.id, u.id);
+  const draft = (ui.examDraft && ui.examDraft[e.id]) || {};
+  if(resp){
+    const s = scoreResponse(e, resp);
+    return `
+    <div class="screen">
+      <button class="btn-ghost mb-2" data-exam-leave>← رجوع</button>
+      <div class="card p-3 mb-3" style="text-align:center;">
+        <div class="big">✅</div>
+        <b style="font-size:16px;">${escapeHtml(e.title)}</b>
+        <div class="muted mt-1">تم تسليم إجاباتك</div>
+        ${e.showScore && s.total ? `<div style="font-size:32px;font-weight:800;color:var(--heading);margin-top:8px;">${s.got} / ${s.total}</div>${s.pending ? `<div class="muted">بعض الأسئلة الكتابية بانتظار تصحيح الخادم</div>` : ''}` : ''}
+      </div>
+      ${e.showScore ? e.questions.map(q=>{
+        const ans = resp.answers[q.id]; const auto = questionAutoPoints(q, ans);
+        const mark = auto===null ? '' : (auto>0 ? '<span style="color:var(--ok);">✓</span> ' : '<span style="color:var(--bad);">✗</span> ');
+        return `<div class="card px-3 py-2 mb-3"><div style="font-weight:700;font-size:13.5px;">${escapeHtml(q.text||'(بدون عنوان)')}</div><div>${mark}${escapeHtml(answerText(q,ans))}</div></div>`;
+      }).join('') : ''}
+    </div>`;
+  }
+  if(e.status!=='open') return `<div class="screen"><button class="btn-ghost mb-2" data-exam-leave>← رجوع</button><div class="empty"><div class="big">🔒</div>هذا الامتحان مغلق.</div></div>`;
+  return `
+  <div class="screen">
+    <button class="btn-ghost mb-2" data-exam-leave>← رجوع</button>
+    <div class="card p-3 mb-3">
+      <b style="font-size:16px;">${escapeHtml(e.title)}</b>
+      ${e.description ? `<p class="muted mt-2 mb-0" style="white-space:pre-wrap;">${escapeHtml(e.description)}</p>` : ''}
+    </div>
+    ${e.questions.map((q,i)=>{
+      const d = draft[q.id];
+      let input = '';
+      if(q.type==='short') input = `<input class="form-control" type="text" data-ans-text="${q.id}" data-fkey="a:${q.id}" value="${escapeHtml(d||'')}">`;
+      else if(q.type==='paragraph') input = `<textarea class="form-control" rows="4" data-ans-text="${q.id}" data-fkey="a:${q.id}">${escapeHtml(d||'')}</textarea>`;
+      else if(q.type==='choice') input = q.options.map((o,idx)=>`<div class="form-check"><input class="form-check-input" type="radio" name="a_${q.id}" id="a_${q.id}_${idx}" data-ans-radio="${q.id}|${idx}" ${d===idx?'checked':''}><label class="form-check-label" for="a_${q.id}_${idx}">${escapeHtml(o)}</label></div>`).join('');
+      else if(q.type==='multi') input = q.options.map((o,idx)=>`<div class="form-check"><input class="form-check-input" type="checkbox" id="a_${q.id}_${idx}" data-ans-check="${q.id}|${idx}" ${Array.isArray(d)&&d.includes(idx)?'checked':''}><label class="form-check-label" for="a_${q.id}_${idx}">${escapeHtml(o)}</label></div>`).join('');
+      else input = `<select class="form-select" data-ans-select="${q.id}"><option value="">اختر...</option>${q.options.map((o,idx)=>`<option value="${idx}" ${d===idx?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
+      return `<div class="card p-3 mb-3"><div style="font-weight:700;margin-bottom:8px;">${i+1}. ${escapeHtml(q.text||'(بدون عنوان)')}${q.required?' <span style="color:var(--bad);">*</span>':''}${q.points?` <span class="muted">(${q.points})</span>`:''}</div>${input}</div>`;
+    }).join('')}
+    <button class="btn btn-gold" data-submit-exam="${e.id}">تسليم الإجابات</button>
+  </div>`;
+}
+
+function bindExamEvents(u){
+  const E = ()=> examOf(ui.editExam);
+  const Q = el => { const e = E(); return e && e.questions.find(x=>x.id===el.dataset.qid); };
+  const live = (el, fn)=>{ el.addEventListener('input', ()=>{ fn(); dirty = true; }); el.addEventListener('change', ()=>{ fn(); persist(); }); };
+
+  document.querySelectorAll('[data-asgsub]').forEach(b=>{ b.onclick = ()=>{ ui.asgSub = b.dataset.asgsub; ui.editExam = null; ui.examResults = null; render(); }; });
+  const addBtn = document.getElementById('addExamBtn');
+  if(addBtn) addBtn.onclick = ()=>{
+    const title = document.getElementById('exam_title').value.trim();
+    if(!title){ showToast('أدخل عنوان الامتحان.'); return; }
+    const e = { id:uid('exam'), title, description:'', classroomId: document.getElementById('exam_cls').value || null, status:'draft', showScore:true, createdBy:u.id, createdAt:nowISO(), questions:[newQuestion()] };
+    state.exams.push(e); log(u.name, `أنشأ امتحانًا: "${title}"`); ui.editExam = e.id; persist(); render();
+  };
+  document.querySelectorAll('[data-edit-exam]').forEach(b=>{ b.onclick = ()=>{ ui.editExam = b.dataset.editExam; render(); }; });
+  document.querySelectorAll('[data-results-exam]').forEach(b=>{ b.onclick = ()=>{ ui.examResults = b.dataset.resultsExam; render(); }; });
+  document.querySelectorAll('[data-exam-back]').forEach(b=>{ b.onclick = ()=>{ ui.editExam = null; ui.examResults = null; render(); }; });
+  document.querySelectorAll('[data-exam-status]').forEach(b=>{
+    b.onclick = ()=>{
+      const [id, st] = b.dataset.examStatus.split('|'); const e = examOf(id);
+      if(st==='open' && !e.questions.some(q=>q.text.trim())){ showToast('أضف سؤالًا واحدًا على الأقل قبل النشر.'); return; }
+      e.status = st; log(u.name, `${st==='open'?'نشر':'أغلق'} امتحان "${e.title}".`); persist(); render();
+    };
+  });
+  document.querySelectorAll('[data-del-exam]').forEach(b=>{
+    b.onclick = ()=>{ const e = examOf(b.dataset.delExam);
+      askConfirm(`حذف امتحان "${e.title}" وكل إجاباته؟`, ()=>{
+        state.exams = state.exams.filter(x=>x.id!==e.id); state.examResponses = state.examResponses.filter(r=>r.examId!==e.id);
+        log(u.name, `حذف امتحان "${e.title}".`); persist(); render(); }); };
+  });
+
+  // --- editor fields ---
+  document.querySelectorAll('[data-efield]').forEach(el=>{
+    const k = el.dataset.efield;
+    if(el.type==='checkbox') el.addEventListener('change', ()=>{ E()[k] = el.checked; persist(); });
+    else live(el, ()=>{ E()[k] = (k==='classroomId') ? (el.value || null) : el.value; });
+  });
+  document.querySelectorAll('[data-qf]').forEach(el=>{
+    live(el, ()=>{ const q = Q(el); if(!q) return; q[el.dataset.qf] = el.dataset.qf==='points' ? Math.max(0, parseInt(el.value,10)||0) : el.value; });
+  });
+  document.querySelectorAll('[data-qreq]').forEach(el=>{ el.addEventListener('change', ()=>{ Q(el).required = el.checked; persist(); }); });
+  document.querySelectorAll('[data-qtype]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const q = Q(el); q.type = el.value;
+      if(isChoiceType(q.type)){ if(!q.options.length) q.options = ['الخيار ١','الخيار ٢']; if(q.type!=='multi') q.correct = q.correct.slice(0,1); }
+      else q.correct = [];
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-qopts]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const q = Q(el); q.options = el.value.split('\n').map(s=>s.trim()).filter(Boolean);
+      q.correct = q.correct.filter(i=>i<q.options.length); persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-qcorrect]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const q = Q(el); const idx = Number(el.dataset.qcorrect);
+      if(q.type==='multi') q.correct = el.checked ? [...new Set([...q.correct, idx])] : q.correct.filter(i=>i!==idx);
+      else q.correct = [idx];
+      persist();
+    });
+  });
+  document.querySelectorAll('[data-qmove]').forEach(b=>{
+    b.onclick = ()=>{
+      const [id, d] = b.dataset.qmove.split('|'); const e = E(); const i = e.questions.findIndex(q=>q.id===id); const j = i + Number(d);
+      if(j<0 || j>=e.questions.length) return;
+      [e.questions[i], e.questions[j]] = [e.questions[j], e.questions[i]]; persist(); render();
+    };
+  });
+  document.querySelectorAll('[data-qdel]').forEach(b=>{
+    b.onclick = ()=>{ const e = E(); if(e.questions.length<=1){ showToast('لازم يبقى سؤال واحد على الأقل.'); return; }
+      e.questions = e.questions.filter(q=>q.id!==b.dataset.qdel); persist(); render(); };
+  });
+  document.querySelectorAll('[data-addq]').forEach(b=>{ b.onclick = ()=>{ E().questions.push(newQuestion()); persist(); render(); }; });
+
+  // --- manual grading ---
+  document.querySelectorAll('[data-manual]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const [rid, qid] = el.dataset.manual.split('|');
+      const r = state.examResponses.find(x=>x.id===rid); const e = examOf(r.examId); const q = e.questions.find(x=>x.id===qid);
+      if(!r.manual) r.manual = {};
+      if(el.value==='') delete r.manual[qid]; else r.manual[qid] = Math.min(q.points, Math.max(0, parseInt(el.value,10)||0));
+      persist(); render();
+    });
+  });
+
+  // --- member: take exam ---
+  const draftFor = ()=>{ ui.examDraft = ui.examDraft || {}; return (ui.examDraft[ui.takingExam] = ui.examDraft[ui.takingExam] || {}); };
+  document.querySelectorAll('[data-take-exam]').forEach(b=>{ b.onclick = ()=>{ ui.takingExam = b.dataset.takeExam; render(); }; });
+  document.querySelectorAll('[data-exam-leave]').forEach(b=>{ b.onclick = ()=>{ ui.takingExam = null; render(); }; });
+  document.querySelectorAll('[data-ans-text]').forEach(el=>{ el.addEventListener('input', ()=>{ draftFor()[el.dataset.ansText] = el.value; }); });
+  document.querySelectorAll('[data-ans-radio]').forEach(el=>{ el.addEventListener('change', ()=>{ const [qid, idx] = el.dataset.ansRadio.split('|'); draftFor()[qid] = Number(idx); }); });
+  document.querySelectorAll('[data-ans-check]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const [qid, idx] = el.dataset.ansCheck.split('|'); const d = draftFor(); const cur = Array.isArray(d[qid]) ? d[qid] : [];
+      d[qid] = el.checked ? [...new Set([...cur, Number(idx)])] : cur.filter(i=>i!==Number(idx));
+    });
+  });
+  document.querySelectorAll('[data-ans-select]').forEach(el=>{ el.addEventListener('change', ()=>{ draftFor()[el.dataset.ansSelect] = el.value==='' ? undefined : Number(el.value); }); });
+  document.querySelectorAll('[data-submit-exam]').forEach(b=>{
+    b.onclick = ()=>{
+      const e = examOf(b.dataset.submitExam);
+      if(e.status!=='open'){ showToast('هذا الامتحان مغلق.'); return; }
+      if(responseOf(e.id, u.id)){ showToast('سلّمت هذا الامتحان من قبل.'); return; }
+      const d = (ui.examDraft && ui.examDraft[e.id]) || {};
+      for(const q of e.questions){
+        const a = d[q.id];
+        const empty = a===undefined || a===null || a==='' || (Array.isArray(a) && !a.length) || (typeof a==='string' && !a.trim());
+        if(q.required && empty){ showToast(`السؤال "${q.text||'بدون عنوان'}" مطلوب.`); return; }
+      }
+      state.examResponses.push({ id:uid('resp'), examId:e.id, memberId:u.id, memberName:u.name, submittedAt:nowISO(), answers: JSON.parse(JSON.stringify(d)), manual:{} });
+      if(ui.examDraft) delete ui.examDraft[e.id];
+      log(u.name, `سلّم امتحان "${e.title}".`); persist(); render();
+    };
+  });
 }
 
 /* ---------------- MINISTRY (khadim/senior_admin: attendance + assignments + points) ---------------- */
@@ -1145,7 +1483,7 @@ async function deleteAssignmentPdf(f){
 }
 function fileSizeLabel(n){ return n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
 
-function renderAssignments(u){
+function renderTasks(u){
   const canCreate = isAdminish(u);
   const editableClassrooms = myClassrooms(u);
   const visible = u.role==='senior_admin' ? state.assignments : state.assignments.filter(a=> !a.classroomId || editableClassrooms.some(c=>c.id===a.classroomId));
@@ -1671,6 +2009,7 @@ function bindAppEvents(u){
 
   // MINISTRY sub nav
   document.querySelectorAll('[data-ministry]').forEach(b=>{ b.onclick = ()=>{ ui.ministrySub = b.dataset.ministry; render(); }; });
+  bindExamEvents(u);
 
   // ATTENDANCE
   document.querySelectorAll('[data-cls]').forEach(b=>{ b.onclick = ()=>{ ui.adminAttClassroom = b.dataset.cls; render(); }; });
