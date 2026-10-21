@@ -3,12 +3,9 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v7 · exams';
+const APP_VERSION = 'v8 · secure';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
-const DIRECTOR_CODE = '__director__';
-const DIRECTOR_EMAIL = 'director@khidma.app';
-const DIRECTOR_PASSWORD = 'Director@2026';
 
 /* ---- Supabase sync (shared database, one row per church, keyed by `code`) ---- */
 const SUPABASE_URL = 'https://owpkjnbnyfldnmubfzsy.supabase.co';
@@ -17,45 +14,34 @@ const SUPA_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABA
 let lastSyncedAt = null;   // updated_at of the last remote state we applied
 let syncing = false;       // true while a push is in flight, to avoid overlapping writes
 
-async function fetchRemoteState(code){
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?code=eq.${encodeURIComponent(code)}&select=data,updated_at`, { headers: SUPA_HEADERS });
-    if(!res.ok) return null;
-    const rows = await res.json();
-    if(rows && rows[0]) return rows[0];
-    return null;
-  }catch(e){ console.warn('Supabase fetch failed (offline or blocked):', e); return null; }
+// All database access goes through secure SQL functions (rpc). The tables themselves are locked.
+async function rpc(fn, params){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, { method:'POST', headers: SUPA_HEADERS, body: JSON.stringify(params || {}) });
+  if(!res.ok){
+    let d = ''; try{ const j = await res.json(); d = j.message || j.hint || ''; }catch(e){}
+    const err = new Error(d || ('HTTP '+res.status)); err.status = res.status; throw err;
+  }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
 }
-async function pushRemoteState(code, s){
-  if(syncing) return;
-  syncing = true;
-  try{
-    const nowIso = new Date().toISOString();
-    await fetch(`${SUPABASE_URL}/rest/v1/app_state?code=eq.${encodeURIComponent(code)}`, {
-      method:'PATCH', headers: SUPA_HEADERS,
-      body: JSON.stringify({ data: s, updated_at: nowIso })
-    });
-    lastSyncedAt = nowIso;
-  }catch(e){ console.warn('Supabase push failed (offline or blocked):', e); }
-  finally{ syncing = false; }
+function rpcFail(e){
+  lastSaveError = (e instanceof TypeError)
+    ? 'لا يوجد اتصال بالإنترنت (أو الاتصال محجوب).'
+    : `خطأ من قاعدة البيانات${e.status ? ' ('+e.status+')' : ''}${e.message ? ': '+e.message : ''}`;
+}
+let directorCreds = null;   // Director email+password, kept in memory only while logged in
+
+async function fetchRemoteState(code){
+  try{ const row = await rpc('get_church', { p_code: code }); return row || null; }
+  catch(e){ console.warn('Supabase fetch failed (offline or blocked):', e); return null; }
 }
 async function createRemoteChurch(code, s){
   const nowIso = new Date().toISOString();
+  if(!directorCreds){ lastSaveError = 'سجّل دخول المدير أولًا.'; return { ok:false, updatedAt: nowIso }; }
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state`, {
-      method:'POST', headers: {...SUPA_HEADERS, 'Prefer':'resolution=merge-duplicates'},
-      body: JSON.stringify({ code, data: s, updated_at: nowIso })
-    });
-    if(res.ok) return { ok:true, updatedAt: nowIso };
-    let detail = '';
-    try{ const j = await res.json(); detail = j.message || j.hint || j.details || ''; }catch(e){}
-    lastSaveError = `خطأ من قاعدة البيانات (${res.status})${detail ? ': '+detail : ''}`;
-    return { ok:false, updatedAt: nowIso, network:false };
-  }catch(e){
-    console.warn('Supabase create failed (offline or blocked):', e);
-    lastSaveError = 'لا يوجد اتصال بالإنترنت (أو الاتصال محجوب).';
-    return { ok:false, updatedAt: nowIso, network:true };
-  }
+    const ok = await rpc('director_create_church', { p_email: directorCreds.email, p_pass: directorCreds.pass, p_code: code, p_data: s });
+    return { ok: !!ok, updatedAt: nowIso };
+  }catch(e){ rpcFail(e); return { ok:false, updatedAt: nowIso }; }
 }
 let lastSaveError = '';
 /* ---- sync: the login session stays on THIS device; pushes are merged with the server and never dropped ---- */
@@ -117,17 +103,13 @@ async function flushPush(){
   try{
     do{
       pushQueued = false;
-      const url = `${SUPABASE_URL}/rest/v1/app_state?code=eq.${encodeURIComponent(churchCode)}`;
-      const get = await fetch(url+'&select=data,updated_at', { headers: SUPA_HEADERS });
-      if(!get.ok) throw new Error('read '+get.status);
-      const rows = await get.json();
-      const remote = rows && rows[0] && rows[0].data;
+      const row = await rpc('get_church', { p_code: churchCode });
+      const remote = row && row.data;
       let toPush = state;
       if(remote && Array.isArray(remote.users) && remote.users.length) toPush = mergeStates(baseState, state, remote);
       const nowIso = new Date().toISOString();
-      const res = await fetch(url, { method:'PATCH', headers:{...SUPA_HEADERS,'Prefer':'return=minimal'},
-        body: JSON.stringify({ data: { ...toPush, session:{userId:null} }, updated_at: nowIso }) });
-      if(!res.ok) throw new Error('write '+res.status);
+      const ok = await rpc('save_church', { p_code: churchCode, p_data: { ...toPush, session:{userId:null} }, p_updated: nowIso });
+      if(!ok) throw new Error('write refused');
       lastSyncedAt = nowIso;
       baseState = clone(toPush);
       if(toPush !== state && !pushQueued && !sameJSON({...toPush,session:0}, {...state,session:0})){
@@ -162,8 +144,7 @@ async function initialSync(){
     adoptRemote(row.data, row.updated_at);
     render();
   } else {
-    const res = await createRemoteChurch(churchCode, { ...state, session:{userId:null} });
-    lastSyncedAt = res.updatedAt; baseState = clone(state);
+    baseState = clone(state);   // no server copy (yet): keep working from this device's copy
   }
 }
 
@@ -289,8 +270,8 @@ let directorChurches = [];
 let directorGlobalNews = [];
 let globalNewsCache = []; // read-only copy any church's app polls, for displaying Director broadcasts
 async function fetchGlobalNews(){
-  const row = await fetchRemoteState(DIRECTOR_CODE);
-  globalNewsCache = (row && row.data && Array.isArray(row.data.globalNews)) ? row.data.globalNews : [];
+  try{ const arr = await rpc('get_global_news'); if(Array.isArray(arr)) globalNewsCache = arr; }
+  catch(e){ /* keep the last copy */ }
 }
 
 // One-time migration: a device that used this app before church codes existed
@@ -603,12 +584,20 @@ function bindChurchGateEvents(){
   if(dirBtn) dirBtn.onclick = async ()=>{
     const email = document.getElementById('dirEmail').value.trim().toLowerCase();
     const pass = document.getElementById('dirPass').value;
-    if(email!==DIRECTOR_EMAIL.toLowerCase() || pass!==DIRECTOR_PASSWORD){ ui.directorError='بيانات الدخول غير صحيحة.'; render(); return; }
-    directorSession = true; ui.directorError='';
-    const row = await fetchRemoteState(DIRECTOR_CODE);
-    directorChurches = (row && row.data && Array.isArray(row.data.churches)) ? row.data.churches : [];
-    directorGlobalNews = (row && row.data && Array.isArray(row.data.globalNews)) ? row.data.globalNews : [];
-    render();
+    dirBtn.disabled = true; dirBtn.textContent = 'جاري التحقق...';
+    try{
+      const ok = await rpc('director_login', { p_email: email, p_pass: pass });
+      if(!ok){ ui.directorError = 'بيانات الدخول غير صحيحة.'; render(); return; }
+      const data = (await rpc('director_get', { p_email: email, p_pass: pass })) || {};
+      directorCreds = { email, pass };
+      directorSession = true; ui.directorError = '';
+      directorChurches = Array.isArray(data.churches) ? data.churches : [];
+      directorGlobalNews = Array.isArray(data.globalNews) ? data.globalNews : [];
+      render();
+    }catch(e){
+      ui.directorError = (e instanceof TypeError) ? 'لا يوجد اتصال بالإنترنت.' : 'تعذّر تسجيل الدخول: '+(e.message||'');
+      render();
+    }
   };
 }
 function genChurchCode(){
@@ -657,19 +646,18 @@ function renderDirector(){
   </div>`;
 }
 async function deleteRemoteChurch(code){
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?code=eq.${encodeURIComponent(code)}`, { method:'DELETE', headers: SUPA_HEADERS });
-    if(res.ok) return { ok:true };
-    let detail=''; try{ const j=await res.json(); detail=j.message||j.hint||''; }catch(e){}
-    lastSaveError = `خطأ من قاعدة البيانات (${res.status})${detail?': '+detail:''}`;
-    return { ok:false };
-  }catch(e){
-    lastSaveError = 'لا يوجد اتصال بالإنترنت (أو الاتصال محجوب).';
-    return { ok:false };
-  }
+  if(!directorCreds){ lastSaveError = 'سجّل دخول المدير أولًا.'; return { ok:false }; }
+  try{ const ok = await rpc('director_delete_church', { p_email: directorCreds.email, p_pass: directorCreds.pass, p_code: code }); return { ok: !!ok }; }
+  catch(e){ rpcFail(e); return { ok:false }; }
 }
 async function saveDirectorData(){
-  return await createRemoteChurch(DIRECTOR_CODE, { churches: directorChurches.map(({pendingState, ...c})=>c), globalNews: directorGlobalNews });
+  const nowIso = new Date().toISOString();
+  if(!directorCreds){ lastSaveError = 'سجّل دخول المدير أولًا.'; return { ok:false, updatedAt: nowIso }; }
+  try{
+    const ok = await rpc('director_save', { p_email: directorCreds.email, p_pass: directorCreds.pass,
+      p_data: { churches: directorChurches.map(({pendingState, ...c})=>c), globalNews: directorGlobalNews } });
+    return { ok: !!ok, updatedAt: nowIso };
+  }catch(e){ rpcFail(e); return { ok:false, updatedAt: nowIso }; }
 }
 function bindDirectorEvents(){
   const confirmYes = document.getElementById('confirmYes');
@@ -690,7 +678,7 @@ function bindDirectorEvents(){
       });
     };
   });
-  const logout = document.getElementById('dirLogoutBtn'); if(logout) logout.onclick = ()=>{ directorSession=false; ui.showDirectorLogin=false; render(); };
+  const logout = document.getElementById('dirLogoutBtn'); if(logout) logout.onclick = ()=>{ directorSession=false; directorCreds=null; ui.showDirectorLogin=false; render(); };
   const sendNewsBtn = document.getElementById('dirSendNewsBtn');
   if(sendNewsBtn) sendNewsBtn.onclick = async ()=>{
     const title = document.getElementById('dirNewsTitle').value.trim();
