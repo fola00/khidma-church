@@ -3,7 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v8 · secure';
+const APP_VERSION = 'v9 · app icon';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 
@@ -2329,29 +2329,9 @@ setInterval(()=>{ if(!ui.scanning) pollRemoteState(); }, 8000);
 /* ---------------- PWA: make the app installable to the home screen ---------------- */
 let deferredInstallPrompt = null;
 (function setupPWA(){
-  try{
-    const iconSvg = crestSVG(512).replace('viewBox="0 0 64 64"', 'viewBox="0 0 64 64" style="background:#5A2A27"');
-    const iconDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
-    const manifest = {
-      name: 'خِدمة — تطبيق مجتمع الكنيسة', short_name: 'خِدمة', start_url: './', scope: './',
-      display: 'standalone', background_color: '#FBF6EE', theme_color: '#5A2A27', dir: 'rtl', lang: 'ar',
-      icons: [
-        { src: iconDataUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
-        { src: iconDataUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
-      ],
-    };
-    const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
-    const link = document.createElement('link'); link.rel = 'manifest'; link.href = manifestUrl;
-    document.head.appendChild(link);
-    const appleIcon = document.getElementById('appleTouchIcon'); if(appleIcon) appleIcon.href = iconDataUrl;
-  }catch(e){ console.warn('PWA manifest setup failed:', e); }
-
+  // manifest, icons and the service worker are real files next to index.html (Chrome requires that to install a real app)
   if('serviceWorker' in navigator){
-    try{
-      const swCode = `self.addEventListener('install', e=>self.skipWaiting()); self.addEventListener('activate', e=>self.clients.claim());`;
-      const swUrl = URL.createObjectURL(new Blob([swCode], { type: 'application/javascript' }));
-      navigator.serviceWorker.register(swUrl).catch(e=>console.warn('Service worker registration failed:', e));
-    }catch(e){ console.warn('Service worker setup failed:', e); }
+    window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Service worker registration failed:', e)); });
   }
 })();
 window.addEventListener('beforeinstallprompt', (e)=>{
