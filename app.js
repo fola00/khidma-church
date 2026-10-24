@@ -3,7 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v11 · new text colours';
+const APP_VERSION = 'v12 · baby-blue light mode';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 
@@ -502,7 +502,26 @@ function generateQRSvg(text){
 /* =========================================================================
    RENDER
    ========================================================================= */
-function render(){
+/* ---------------- THEME: light (baby blue) / dark / auto ---------------- */
+const THEME_KEY = 'khidma_theme';
+function currentTheme(){ try{ return localStorage.getItem(THEME_KEY) || 'light'; }catch(e){ return 'light'; } }
+function applyTheme(t){
+  const root = document.documentElement;
+  if(t==='auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+  const dark = t==='dark' || (t==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', dark ? '#2A0C15' : '#245F94');
+}
+function setTheme(t){ try{ localStorage.setItem(THEME_KEY, t); }catch(e){} applyTheme(t); render(); }
+function themeSwitcherHTML(){
+  const t = currentTheme();
+  const b = (k,label)=>`<button type="button" class="theme-btn ${t===k?'active':''}" data-theme-set="${k}">${label}</button>`;
+  return `<div class="theme-switch" role="group" aria-label="المظهر">${b('light','☀️ فاتح')}${b('dark','🌙 داكن')}${b('auto','🖥 تلقائي')}</div>`;
+}
+function bindThemeButtons(){ document.querySelectorAll('[data-theme-set]').forEach(b=>{ b.onclick = ()=> setTheme(b.dataset.themeSet); }); }
+applyTheme(currentTheme());
+
+function render(){ renderCore(); bindThemeButtons(); }
+function renderCore(){
   checkEmergencyExpiry();
   const root = document.getElementById('root');
   const chatEl = document.getElementById('chatInput');
@@ -548,6 +567,7 @@ function renderChurchGate(){
       <div class="text-center" style="margin-top:16px;"><button class="btn-ghost" id="toChurchGate" type="button">رجوع لتسجيل الدخول بكود الكنيسة</button></div>
     `}
     <div class="text-center" style="margin-top:10px;"><button class="btn btn-outline btn-sm install-app-btn" onclick="triggerInstall()">📲 تثبيت التطبيق على الشاشة الرئيسية</button></div>
+    ${themeSwitcherHTML()}
     <div class="text-center muted" style="margin-top:14px;font-size:11px;">الإصدار ${APP_VERSION}</div>
   </div>`;
 }
@@ -745,8 +765,8 @@ function bindDirectorEvents(){
 /* ---------------- AUTH ---------------- */
 function crestSVG(size){
   return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="32" cy="32" r="30" fill="none" stroke="#C79A3D" stroke-width="2"/>
-    <g fill="#C79A3D">
+    <circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="2"/>
+    <g fill="currentColor">
       <path d="M28 10 H36 V26 H52 V34 H36 V54 H28 V34 H12 V26 H28 Z"/>
       <circle cx="32" cy="6" r="4"/><circle cx="26.5" cy="11" r="3.2"/><circle cx="37.5" cy="11" r="3.2"/>
       <circle cx="32" cy="58" r="4"/><circle cx="26.5" cy="53" r="3.2"/><circle cx="37.5" cy="53" r="3.2"/>
@@ -769,6 +789,7 @@ function renderAuth(){
     </div>
     ${tab==='login' ? renderLoginForm() : renderSignupForm()}
     <div class="text-center" style="margin-top:10px;"><button class="btn-ghost" id="leaveChurchBtn" type="button" style="font-size:11.5px;color:var(--text-soft);">كود كنيسة مختلف؟</button></div>
+    ${themeSwitcherHTML()}
     <div class="text-center muted" style="margin-top:8px;font-size:11px;">الإصدار ${APP_VERSION}</div>
   </div>`;
 }
@@ -954,6 +975,11 @@ function renderSettings(u){
       <div id="settingsProfileError" class="muted" style="color:var(--bad);display:none;margin-bottom:8px;"></div>
       <button class="btn btn-gold" id="saveProfileBtn">حفظ التعديلات</button>
       <p class="muted" style="margin-top:8px;">الدور: ${roleLabel(u.role)}${cls ? ' · الفصل: '+escapeHtml(cls.name) : ''}</p>
+    </div>
+
+    <div class="card p-3 mb-3" style="text-align:center;">
+      <b style="font-size:14px;">المظهر</b>
+      ${themeSwitcherHTML()}
     </div>
 
     <div class="card px-3 py-2 mb-3" style="text-align:center;">
