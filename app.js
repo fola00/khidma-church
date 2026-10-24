@@ -3,7 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v9 · app icon';
+const APP_VERSION = 'v11 · new text colours';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 
@@ -511,16 +511,16 @@ function render(){
   const fkey = (ae && ae !== document.body) ? ((ae.dataset && ae.dataset.fkey) || null) : null;
   const selS = fkey ? ae.selectionStart : null, selE = fkey ? ae.selectionEnd : null;
 
-  if(directorSession){ root.innerHTML = renderDirector(); bindDirectorEvents(); return; }
-  if(!churchCode){ root.innerHTML = renderChurchGate(); bindChurchGateEvents(); return; }
+  if(directorSession){ root.className = 'wide-shell'; root.innerHTML = renderDirector(); bindDirectorEvents(); return; }
+  if(!churchCode){ root.className = 'auth-shell'; root.innerHTML = renderChurchGate(); bindChurchGateEvents(); return; }
 
   const u = currentUser();
-  if(!u){ root.innerHTML = renderAuth(); bindAuthEvents(); return; }
-  if(u.status === 'banned'){ root.innerHTML = renderBanned(u); bindPendingEvents(); return; }
-  if(u.status === 'pending'){ root.innerHTML = renderPending(u); bindPendingEvents(); return; }
-  if(u.status === 'rejected'){ root.innerHTML = renderRejected(u); bindPendingEvents(); return; }
+  if(!u){ root.className = 'auth-shell'; root.innerHTML = renderAuth(); bindAuthEvents(); return; }
+  if(u.status === 'banned'){ root.className = 'auth-shell'; root.innerHTML = renderBanned(u); bindPendingEvents(); return; }
+  if(u.status === 'pending'){ root.className = 'auth-shell'; root.innerHTML = renderPending(u); bindPendingEvents(); return; }
+  if(u.status === 'rejected'){ root.className = 'auth-shell'; root.innerHTML = renderRejected(u); bindPendingEvents(); return; }
 
-  root.innerHTML = renderApp(u);
+  root.className = 'app-shell'; root.innerHTML = renderApp(u);
   bindAppEvents(u);
   if(fkey){ const el = document.querySelector(`[data-fkey="${fkey}"]`); if(el){ el.focus(); try{ el.setSelectionRange(selS, selE); }catch(e){} } }
   if(typed){ const el = document.getElementById('chatInput'); if(el){ el.value = typed; if(hadFocus) el.focus(); } }

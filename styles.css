@@ -11,7 +11,7 @@
     --parchment-2:#EDE0BF;
     --paper:#FFFBF3;
     --text:#2B211C;
-    --text-soft:#7A6C58;
+    --text-soft:#8A2D45;
     --line:#E2D2A0;
     --ok:#3C6E47;
     --bad:#B23A3A;
@@ -22,14 +22,14 @@
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --ink:#2A0C15; --ink-2:#3A0F1C; --heading:#E8C878; --parchment:#1C1712; --parchment-2:#28211A;
-      --paper:#161210; --text:#EEE3CE; --text-soft:#B9AA8E; --line:#3E3324;
+      --paper:#161210; --text:#EEE3CE; --text-soft:#E6C27A; --line:#3E3324;
       --teal:#3E938E; --shadow:0 6px 24px rgba(0,0,0,0.45);
       --bubble-them:#3A3023; --bubble-them-text:#F8F0DC;
     }
   }
   :root[data-theme="dark"]{
     --ink:#2A0C15; --ink-2:#3A0F1C; --heading:#E8C878; --parchment:#1C1712; --parchment-2:#28211A;
-    --paper:#161210; --text:#EEE3CE; --text-soft:#B9AA8E; --line:#3E3324;
+    --paper:#161210; --text:#EEE3CE; --text-soft:#E6C27A; --line:#3E3324;
     --teal:#3E938E; --shadow:0 6px 24px rgba(0,0,0,0.45);
     --bubble-them:#3A3023; --bubble-them-text:#F8F0DC;
   }
@@ -58,7 +58,7 @@
   .topbar .crest{width:32px;height:32px;flex:none;}
   .topbar .titles{flex:1;min-width:0;}
   .topbar h1{font-family:'Amiri',serif;font-size:19px;margin:0;font-weight:700;color:var(--gold-light);letter-spacing:.5px;}
-  .topbar .sub{font-size:11px;color:#D8B9A0;margin-top:1px;}
+  .topbar .sub{font-size:11px;color:#F0D9B5;margin-top:1px;}
   .topbar .userchip{font-size:11.5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);padding:6px 10px;border-radius:20px;display:flex;align-items:center;gap:6px;flex:none;}
   .topbar .userchip .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);}
   .logoutbtn{
@@ -94,7 +94,7 @@
     background-color:var(--paper);color:var(--text);font-size:14.5px;
   }
   .form-control:focus, .form-select:focus{background-color:var(--paper);color:var(--text);outline:2px solid var(--gold);border-color:var(--gold);box-shadow:none;}
-  .form-control::placeholder{color:var(--text-soft);opacity:.7;}
+  .form-control::placeholder{color:var(--text-soft);opacity:.75;}
   textarea.form-control{resize:vertical;min-height:70px;}
   .equal-cols > *{flex:1;}
 
@@ -175,7 +175,7 @@
   }
   .tab{
     flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-    padding:6px 1px;background:none;border:none;color:#C9A08C;cursor:pointer;font-size:9.8px;font-family:inherit;font-weight:700;
+    padding:6px 1px;background:none;border:none;color:#EBD3B0;cursor:pointer;font-size:10.5px;font-family:inherit;font-weight:700;
   }
   .tab .ic{font-size:17px;line-height:1;}
   .tab.active{color:var(--gold-light);}
@@ -245,3 +245,57 @@
   .confirm-box{background:var(--paper);border-radius:16px;padding:20px;width:100%;max-width:340px;box-shadow:var(--shadow);}
   .confirm-box p{margin:0 0 16px;font-size:14.5px;line-height:1.7;color:var(--text);text-align:center;}
   #qrHolder svg{width:100%;height:100%;display:block;}
+
+/* =====================================================================
+   RESPONSIVE: phone (default) → tablet → PC
+   Phones keep the bottom tab bar. From 900px up the tabs become a side menu
+   (on the right, because the app is right-to-left) and the content gets room.
+   ===================================================================== */
+@media (min-width: 640px){
+  body{background:var(--parchment-2);}
+  #root{max-width:720px;box-shadow:0 0 40px rgba(0,0,0,.14);}
+  .tabbar,.scan-overlay,.confirm-overlay{max-width:720px;}
+  /* login / church-code / waiting screens: a centred card instead of a stretched page */
+  #root.auth-shell{max-width:500px;min-height:0;margin:32px auto;border-radius:22px;overflow:hidden;}
+  .auth-wrap{min-height:0;}
+}
+@media (min-width: 900px){
+  #root.auth-shell{margin:56px auto;}
+  #root.wide-shell{max-width:980px;min-height:100vh;}
+
+  /* logged-in app: top bar across, side menu on the right, content beside it */
+  #root.app-shell{
+    max-width:1280px;min-height:100vh;
+    display:grid;grid-template-columns:250px minmax(0,1fr);grid-template-rows:auto auto 1fr;
+  }
+  #root.app-shell > .topbar{grid-column:1 / -1;grid-row:1;padding:14px 32px;}
+  #root.app-shell > .emergency-banner{grid-column:1 / -1;grid-row:2;}
+  #root.app-shell > .content{grid-column:2;grid-row:3;overflow:visible;padding:28px 40px 56px;}
+  #root.app-shell > .content > .screen{max-width:920px;margin:0 auto;}
+  #root.app-shell > .tabbar{
+    grid-column:1;grid-row:3;position:sticky;top:64px;align-self:start;
+    height:calc(100vh - 64px);overflow-y:auto;
+    flex-direction:column;justify-content:flex-start;gap:4px;
+    max-width:none;width:auto;margin:0;padding:18px 12px;border-top:none;
+  }
+  #root.app-shell > .tabbar .tab{
+    flex:none;flex-direction:row;justify-content:flex-start;gap:12px;
+    padding:13px 16px;border-radius:12px;font-size:15px;
+  }
+  #root.app-shell > .tabbar .tab .ic{font-size:20px;}
+  #root.app-shell > .tabbar .tab:hover{background:rgba(255,255,255,.07);}
+  #root.app-shell > .tabbar .tab.active{background:rgba(255,255,255,.12);}
+
+  .confirm-overlay,.scan-overlay{max-width:none;left:0;right:0;}
+  .app-toast{bottom:28px;}
+  .chat-thread{height:calc(100vh - 230px);}
+  /* keep big action buttons a sensible size on wide cards */
+  .screen > .btn:not(.btn-sm), .card > .btn:not(.btn-sm){max-width:420px;}
+}
+@media (min-width: 1400px){
+  #root.app-shell{max-width:1360px;}
+}
+
+/* safety net: button colours still apply even if Bootstrap's own file didn't load */
+.btn,.btn:hover,.btn:focus,.btn:active{color:var(--bs-btn-color,var(--text));}
+.btn-primary,.btn-gold,.btn-teal,.btn-danger{border-color:var(--bs-btn-border-color,transparent);}
