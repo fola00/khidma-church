@@ -3,7 +3,7 @@
    Client-only demo: persistence via localStorage on this device only.
    ======================================================================= */
 
-const APP_VERSION = 'v12 · baby-blue light mode';
+const APP_VERSION = 'v13 · daily psalms + notifications';
 const STORAGE_PREFIX = 'khidma_church_app_v3_';
 const CHURCH_CODE_KEY = 'khidma_church_code';
 
@@ -288,7 +288,7 @@ async function fetchGlobalNews(){
 
 const emptyShellState = ()=>({ session:{userId:null}, users:[], sectors:[], stages:[], classrooms:[], attendance:[], assignments:[], exams:[], examResponses:[], news:[], chats:[], settings:{pointsQuddas:5,pointsIjtimaa:5}, pointsLog:[], emergency:{active:false,byUserId:null,originalRole:null,grantedAt:null,log:[]}, auditLog:[] });
 let state = churchCode ? (loadState(churchCode) || emptyShellState()) : emptyShellState();
-let ui = { authTab:'login', activeTab:'news', openChatId:null,
+let ui = { authTab:'login', activeTab:'today', openChatId:null,
            adminAttClassroom:null, ministrySub:'attendance', adminSub:'pending', toast:null, scanning:false, confirm:null,
            gateCode:'', gateError:'', gateBusy:false, showDirectorLogin:false, directorError:'',
            dirNewName:'', dirNewAdminName:'', dirNewAdminEmail:'', dirNewAdminPass:'', resetPwFor:null };
@@ -520,7 +520,7 @@ function themeSwitcherHTML(){
 function bindThemeButtons(){ document.querySelectorAll('[data-theme-set]').forEach(b=>{ b.onclick = ()=> setTheme(b.dataset.themeSet); }); }
 applyTheme(currentTheme());
 
-function render(){ renderCore(); bindThemeButtons(); }
+function render(){ renderCore(); bindThemeButtons(); if(typeof ensureReminders==='function') ensureReminders(); }
 function renderCore(){
   checkEmergencyExpiry();
   const root = document.getElementById('root');
@@ -915,10 +915,10 @@ function bindPendingEvents(){ const b = document.getElementById('logoutBtn2'); i
 /* ---------------- APP SHELL ---------------- */
 function tabsFor(role){
   if(role==='makhdoum') return [
-    {id:'news', label:'الأخبار', ic:'📰'}, {id:'mine', label:'حضوري', ic:'✅'}, {id:'chat', label:'الدردشة', ic:'💬'}, {id:'settings', label:'الإعدادات', ic:'⚙️'},
+    {id:'today', label:'اليوم', ic:'📖'}, {id:'news', label:'الأخبار', ic:'📰'}, {id:'mine', label:'حضوري', ic:'✅'}, {id:'chat', label:'الدردشة', ic:'💬'}, {id:'settings', label:'الإعدادات', ic:'⚙️'},
   ];
   const base = [
-    {id:'news', label:'الأخبار', ic:'📰'}, {id:'ministry', label:'الخدمة', ic:'🗂️'}, {id:'chat', label:'الدردشة', ic:'💬'},
+    {id:'today', label:'اليوم', ic:'📖'}, {id:'news', label:'الأخبار', ic:'📰'}, {id:'ministry', label:'الخدمة', ic:'🗂️'}, {id:'chat', label:'الدردشة', ic:'💬'},
   ];
   if(role==='senior_admin' || role==='super_admin') base.push({id:'admin', label:'الإدارة', ic:'🛡️'});
   base.push({id:'settings', label:'الإعدادات', ic:'⚙️'});
@@ -928,7 +928,7 @@ function roleLabel(r){ return r==='senior_admin' ? 'مدير الكنيسة' : r
 
 function renderApp(u){
   const tabs = tabsFor(u.role);
-  if(!tabs.find(t=>t.id===ui.activeTab)) ui.activeTab = 'news';
+  if(!tabs.find(t=>t.id===ui.activeTab)) ui.activeTab = 'today';
   let emergencyBanner = '';
   if(state.emergency.active && state.emergency.byUserId===u.id){
     const grantedAt = new Date(state.emergency.grantedAt).getTime();
@@ -950,6 +950,7 @@ function renderApp(u){
   `;
 }
 function renderTab(u, tab){
+  if(tab==='today') return renderToday(u);
   if(tab==='news') return renderNews(u);
   if(tab==='mine') return renderMine(u);
   if(tab==='ministry') return renderMinistry(u);
@@ -957,6 +958,279 @@ function renderTab(u, tab){
   if(tab==='admin') return renderAdmin(u);
   if(tab==='settings') return renderSettings(u);
   return '';
+}
+
+/* ---------------- TODAY: 3 psalms a day + a word of encouragement + reminders ---------------- */
+const VAPID_PUBLIC_KEY = 'BCgogBtQZl5k7toCZ6lBxo3vxiVLKdXW5bIClCrpsX7Q5xfglbx9Y2HDjlQUKTxIeg1wGVamNiWGzSO4Dl1q_lo';   // public half of the push key (safe to be in the file)
+const PSALM_SLOTS = [ { name:'مزمور الصباح', ic:'🌅' }, { name:'مزمور الظهر', ic:'☀️' }, { name:'مزمور المساء', ic:'🌙' } ];
+const WORDS = [
+  { t:'أستطيع كل شيء في المسيح الذي يقويني.', r:'فيلبي ٤ : ١٣' },
+  { t:'لا تخف لأني معك. لا تتلفت لأني إلهك. قد أيدتك وأعنتك وعضدتك بيمين بري.', r:'إشعياء ٤١ : ١٠' },
+  { t:'تشدد وتشجع! لا ترهب ولا ترتعب لأن الرب إلهك معك حيثما تذهب.', r:'يشوع ١ : ٩' },
+  { t:'تعالوا إلي يا جميع المتعبين والثقيلي الأحمال وأنا أريحكم.', r:'متى ١١ : ٢٨' },
+  { t:'سلاما أترك لكم. سلامي أعطيكم. ليس كما يعطي العالم أعطيكم أنا. لا تضطرب قلوبكم ولا ترهب.', r:'يوحنا ١٤ : ٢٧' },
+  { t:'إن كان الله معنا فمن علينا؟', r:'رومية ٨ : ٣١' },
+  { t:'لأن الله لم يعطنا روح الفشل بل روح القوة والمحبة والنصح.', r:'٢ تيموثاوس ١ : ٧' },
+  { t:'توكل على الرب بكل قلبك وعلى فهمك لا تعتمد.', r:'أمثال ٣ : ٥' },
+  { t:'فلا نفشل في عمل الخير لأننا سنحصد في وقته إن كنا لا نكل.', r:'غلاطية ٦ : ٩' },
+  { t:'كونوا راسخين غير متزعزعين، مكثرين في عمل الرب كل حين، عالمين أن تعبكم ليس باطلا في الرب.', r:'١ كورنثوس ١٥ : ٥٨' },
+  { t:'اقتربوا إلى الله فيقترب إليكم.', r:'يعقوب ٤ : ٨' },
+  { t:'ملقين كل همكم عليه لأنه هو يعتني بكم.', r:'١ بطرس ٥ : ٧' },
+  { t:'اطلبوا أولا ملكوت الله وبره وهذه كلها تزاد لكم.', r:'متى ٦ : ٣٣' },
+  { t:'الرب يقاتل عنكم وأنتم تصمتون.', r:'خروج ١٤ : ١٤' },
+  { t:'في العالم سيكون لكم ضيق، ولكن ثقوا: أنا قد غلبت العالم.', r:'يوحنا ١٦ : ٣٣' },
+  { t:'كل شيء مستطاع للمؤمن.', r:'مرقس ٩ : ٢٣' },
+  { t:'يسوع المسيح هو هو أمسا واليوم وإلى الأبد.', r:'عبرانيين ١٣ : ٨' },
+  { t:'الذي فيكم أعظم من الذي في العالم.', r:'١ يوحنا ٤ : ٤' },
+  { t:'فرحين في الرجاء، صابرين في الضيق، مواظبين على الصلاة.', r:'رومية ١٢ : ١٢' },
+  { t:'كل ما فعلتم فاعملوا من القلب كما للرب ليس للناس.', r:'كولوسي ٣ : ٢٣' },
+  { t:'افرحوا كل حين. صلوا بلا انقطاع. اشكروا في كل شيء.', r:'١ تسالونيكي ٥ : ١٦-١٨' },
+  { t:'ليس شيء غير ممكن لدى الله.', r:'لوقا ١ : ٣٧' },
+  { t:'وها أنا معكم كل الأيام إلى انقضاء الدهر.', r:'متى ٢٨ : ٢٠' },
+  { t:'ألق على الرب أعمالك فتثبت أفكارك.', r:'أمثال ١٦ : ٣' },
+  { t:'تقووا في الرب وفي شدة قوته.', r:'أفسس ٦ : ١٠' },
+  { t:'إنه من إحسانات الرب أننا لم نفن لأن مراحمه لا تزول. هي جديدة في كل صباح. كثيرة أمانتك.', r:'مراثي إرميا ٣ : ٢٢-٢٣' },
+  { t:'منتظرو الرب يجددون قوة. يرفعون أجنحة كالنسور. يركضون ولا يتعبون. يمشون ولا يعيون.', r:'إشعياء ٤٠ : ٣١' },
+  { t:'لأني عرفت الأفكار التي أنا مفتكر بها عنكم، يقول الرب، أفكار سلام لا شر، لأعطيكم آخرة ورجاء.', r:'إرميا ٢٩ : ١١' },
+  { t:'لا تخافوا ولا ترهبوا... لأن الرب إلهك سائر معك. لا يهملك ولا يتركك.', r:'تثنية ٣١ : ٦' },
+  { t:'خطوة صغيرة كل يوم تصنع فرقًا كبيرًا مع الوقت.', r:'' },
+  { t:'من يخدم بمحبة لا يضيع تعبه أبدًا.', r:'' },
+  { t:'ابدأ يومك بصلاة قصيرة، وسترى قلبك أهدأ وخطواتك أثبت.', r:'' },
+  { t:'لا تقارن بدايتك بنهاية غيرك؛ لكل واحد رحلته مع الله.', r:'' },
+  { t:'الأمانة في الصغير هي أول الطريق إلى الكبير.', r:'' },
+  { t:'كل مرة تقوم فيها بعد السقوط هي انتصار صغير.', r:'' },
+  { t:'قلبك أغلى ما تملك؛ احرسه بالصلاة وكلمة الله.', r:'' },
+  { t:'اليوم فرصة جديدة، فلا تؤجلها.', r:'' },
+  { t:'ابتسامتك لإخوتك قد تكون صلاة مستجابة لهم.', r:'' },
+  { t:'اجتهد اليوم، والله يتمم الباقي.', r:'' },
+  { t:'الصلاة ليست هروبًا من الحياة بل قوة لمواجهتها.', r:'' },
+  { t:'كن نورًا صغيرًا في مكانك، وسترى الظلام يتراجع.', r:'' },
+  { t:'الاستمرار أهم من الكمال؛ واصل ولا تتوقف.', r:'' },
+  { t:'تذكّر أن الله لم يبدأ فيك عملًا ليتركه ناقصًا.', r:'' },
+  { t:'كل خدمة صغيرة تقدمها لله تُحسب عظيمة عنده.', r:'' },
+  { t:'اختر الشكر اليوم، وسيتغير شكل يومك.', r:'' },
+];
+/* The day is always counted by Cairo's calendar, so the whole church (and the push messages) read the same psalms. */
+function cairoParts(d = new Date()){
+  const f = new Intl.DateTimeFormat('en-GB', { timeZone:'Africa/Cairo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
+  const p = {}; f.formatToParts(d).forEach(x=>{ p[x.type] = x.value; });
+  return { y:+p.year, m:+p.month, d:+p.day, h:(+p.hour)%24, min:+p.minute };
+}
+function dayNumber(c){ return Math.floor(Date.UTC(c.y, c.m-1, c.d) / 86400000); }
+function psalmForSlot(dn, slot){ return (dn % 50) * 3 + 1 + slot; }          // 3 psalms a day → all 150 in 50 days
+function wordOfDay(dn){ return WORDS[dn % WORDS.length]; }
+function dateKeyOf(dn){ const d = new Date(dn*86400000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; }
+
+/* Psalm numbers follow the Coptic Orthodox (Septuagint) order. The Arabic Van Dyck text is numbered the Hebrew way,
+   so each Coptic number is mapped to the matching Van Dyck chapter(s). */
+function psalmParts(n){
+  if(n<=8) return [{ c:n }];
+  if(n===9) return [{ c:9 }, { c:10 }];
+  if(n<=112) return [{ c:n+1 }];
+  if(n===113) return [{ c:114 }, { c:115 }];
+  if(n===114) return [{ c:116, from:1, to:9 }];
+  if(n===115) return [{ c:116, from:10, to:19 }];
+  if(n<=145) return [{ c:n+1 }];
+  if(n===146) return [{ c:147, from:1, to:11 }];
+  if(n===147) return [{ c:147, from:12, to:20 }];
+  return [{ c:n }];
+}
+async function loadPsalmText(n){
+  const key = 'khidma_psalm_v1_' + n;
+  try{ const cached = localStorage.getItem(key); if(cached) return JSON.parse(cached); }catch(e){}
+  const out = [];
+  for(const part of psalmParts(n)){
+    const res = await fetch(`https://api.getbible.net/v2/arabicsv/19/${part.c}.json`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    let vs = data.verses; if(vs && !Array.isArray(vs)) vs = Object.values(vs);
+    if(!Array.isArray(vs) || !vs.length) throw new Error('unexpected format');
+    vs.forEach(v=>{ const vn = Number(v.verse); if((part.from && vn<part.from) || (part.to && vn>part.to)) return; const t = String(v.text||'').trim(); if(t) out.push(t); });
+  }
+  if(!out.length) throw new Error('empty');
+  try{ localStorage.setItem(key, JSON.stringify(out)); }catch(e){}
+  return out;
+}
+
+/* reading progress (kept on this device) */
+const readKey = u => `khidma_read_${churchCode}_${u.id}`;
+function readLog(u){ try{ return JSON.parse(localStorage.getItem(readKey(u)) || '{}'); }catch(e){ return {}; } }
+function setRead(u, dk, slot, val){
+  const log = readLog(u); const row = log[dk] || [false,false,false]; row[slot] = !!val; log[dk] = row;
+  const keys = Object.keys(log).sort(); while(keys.length > 400) delete log[keys.shift()];
+  try{ localStorage.setItem(readKey(u), JSON.stringify(log)); }catch(e){}
+}
+function streakOf(u, dn){
+  const log = readLog(u); const full = k => (log[dateKeyOf(k)] || []).filter(Boolean).length === 3;
+  let k = full(dn) ? dn : dn-1, n = 0;
+  while(full(k) && n < 3650){ n++; k--; }
+  return n;
+}
+
+/* reminders */
+const REMIND_KEY = 'khidma_remind';
+function getRemind(){ try{ const r = JSON.parse(localStorage.getItem(REMIND_KEY)||'null'); if(r && Array.isArray(r.times) && r.times.length===3) return r; }catch(e){} return { on:false, times:['07:00','14:00','21:00'] }; }
+function saveRemind(r){ try{ localStorage.setItem(REMIND_KEY, JSON.stringify(r)); }catch(e){} }
+const notifSupported = () => ('Notification' in window) && ('serviceWorker' in navigator);
+async function showLocalNotification(title, body, tag){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(title, { body, icon:'icon-192.png', badge:'favicon.png', dir:'rtl', lang:'ar', tag, data:{ url:'./#today' } });
+  }catch(e){ console.warn('notification failed', e); }
+}
+function fireReminder(slot){
+  const u = currentUser(); if(!u) return;
+  const c = cairoParts(), dn = dayNumber(c), dk = dateKeyOf(dn);
+  if((readLog(u)[dk] || [])[slot]) return;                              // already read — stay quiet
+  const sk = `khidma_notified_${dk}_${slot}`; if(localStorage.getItem(sk)) return;
+  try{ localStorage.setItem(sk, '1'); }catch(e){}
+  showLocalNotification(`📖 ${PSALM_SLOTS[slot].name}`, `مزمور ${psalmForSlot(dn, slot)} — ${wordOfDay(dn).t}`, `psalm-${slot}`);
+}
+let reminderTimers = [], reminderArmedFor = undefined;
+function scheduleReminders(){
+  reminderTimers.forEach(clearTimeout); reminderTimers = [];
+  const cfg = getRemind();
+  if(!cfg.on || !notifSupported() || Notification.permission!=='granted' || !currentUser()) return;
+  const now = new Date();
+  cfg.times.forEach((tm, slot)=>{
+    const [h,m] = tm.split(':').map(Number); const at = new Date(); at.setHours(h, m, 0, 0);
+    if(at <= now) at.setDate(at.getDate()+1);
+    reminderTimers.push(setTimeout(()=>{ fireReminder(slot); scheduleReminders(); }, at - now));
+  });
+}
+function catchUpReminders(){
+  const cfg = getRemind(); if(!cfg.on || !notifSupported() || Notification.permission!=='granted' || !currentUser()) return;
+  const now = new Date();
+  cfg.times.forEach((tm, slot)=>{ const [h,m] = tm.split(':').map(Number); const at = new Date(); at.setHours(h, m, 0, 0); const late = now - at; if(late >= 0 && late < 3*3600*1000) fireReminder(slot); });
+}
+function ensureReminders(){
+  const u = currentUser(), id = u ? u.id : null;
+  if(id === reminderArmedFor) return; reminderArmedFor = id; scheduleReminders();
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ scheduleReminders(); catchUpReminders(); } });
+
+/* push (works even when the app is closed — needs the one-time server setup) */
+const urlB64ToUint8Array = b => { const s = (b + '='.repeat((4 - b.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/'); const raw = atob(s); return Uint8Array.from([...raw].map(ch=>ch.charCodeAt(0))); };
+const pushSupported = () => notifSupported() && ('PushManager' in window);
+async function enablePush(u){
+  if(!pushSupported()){ showToast('متصفحك لا يدعم الإشعارات الفورية. على الآيفون ثبّت التطبيق أولًا.'); return; }
+  const perm = await Notification.requestPermission();
+  if(perm !== 'granted'){ showToast('لم يتم السماح بالإشعارات.'); render(); return; }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY) });
+    const ok = await rpc('save_push_subscription', { p_church: churchCode, p_member: u.id, p_sub: sub.toJSON() });
+    if(!ok) throw new Error('رُفض الحفظ');
+    try{ localStorage.setItem('khidma_push_on','1'); }catch(e){}
+    showToast('تم تفعيل الإشعارات الفورية ✓');
+  }catch(e){ console.warn(e); showToast('تعذّر التفعيل: ' + (e.message||'') ); }
+  render();
+}
+async function disablePush(){
+  try{
+    const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription();
+    if(sub){ try{ await rpc('delete_push_subscription', { p_endpoint: sub.endpoint }); }catch(e){} await sub.unsubscribe(); }
+  }catch(e){}
+  try{ localStorage.removeItem('khidma_push_on'); }catch(e){}
+  showToast('تم إيقاف الإشعارات الفورية.'); render();
+}
+
+function renderToday(u){
+  const c = cairoParts(), dn = dayNumber(c), dk = dateKeyOf(dn);
+  const done = readLog(u)[dk] || [false,false,false];
+  const count = done.filter(Boolean).length, streak = streakOf(u, dn), w = wordOfDay(dn);
+  const cfg = getRemind();
+  const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+  const pushOn = localStorage.getItem('khidma_push_on')==='1' && perm==='granted';
+  const remindOn = cfg.on && perm==='granted';
+  const psalmCard = (s, i)=>{
+    const n = psalmForSlot(dn, i), open = ui.openPsalm === i, read = !!done[i];
+    let body = '';
+    if(open){
+      const verses = ui.psalmData && ui.psalmData[n];
+      if(verses) body = `<div class="psalm-text">${verses.map((t,k)=>`<p><span class="vn">${k+1}</span>${escapeHtml(t)}</p>`).join('')}</div>`;
+      else if(ui.psalmErr && ui.psalmErr[n]) body = `<div class="muted" style="margin:10px 0;">تعذّر تحميل النص الآن (تحتاج اتصالًا بالإنترنت أول مرة). <a href="https://www.google.com/search?q=${encodeURIComponent('مزمور '+n+' الكتاب المقدس')}" target="_blank" rel="noopener" style="color:var(--teal);font-weight:700;">افتح المزمور في المتصفح</a></div>`;
+      else body = `<div class="muted" style="margin:10px 0;">جاري تحميل المزمور…</div>`;
+      body += `<button class="btn ${read?'btn-outline':'btn-teal'} btn-sm" data-read-psalm="${i}">${read?'↩︎ إلغاء علامة القراءة':'✓ قرأته'}</button>`;
+    }
+    return `
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center gap-2">
+        <div><b style="font-size:15px;">${s.ic} ${s.name}</b><div class="muted">مزمور ${n}</div></div>
+        <div class="d-flex align-items-center gap-2">
+          ${read ? `<span class="badge rounded-pill badge-ok">✓ تمت</span>` : ''}
+          <button class="btn btn-gold btn-sm" data-open-psalm="${i}">${open?'إخفاء':'📖 اقرأ'}</button>
+        </div>
+      </div>
+      ${body}
+    </div>`;
+  };
+  const timeRow = PSALM_SLOTS.map((s,i)=>`<div class="d-flex justify-content-between align-items-center mb-2"><label class="form-label m-0">${s.ic} ${s.name}</label><input class="form-control" type="time" style="width:150px;" value="${cfg.times[i]}" data-remind-time="${i}"></div>`).join('');
+  return `
+  <div class="screen">
+    <h2 class="section-title">اليوم</h2>
+    <div class="card p-3 mb-3" style="text-align:center;">
+      <div class="muted">✨ كلمة اليوم</div>
+      <p style="font-size:17px;line-height:1.9;margin:8px 0;font-weight:700;color:var(--heading);">«${escapeHtml(w.t)}»</p>
+      ${w.r ? `<div class="muted">${escapeHtml(w.r)}</div>` : ''}
+    </div>
+    <div class="card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center"><b>مزامير اليوم</b><span class="badge rounded-pill badge-gold">${count} / 3</span></div>
+      <div class="today-progress mt-2"><span style="width:${Math.round(count/3*100)}%"></span></div>
+      <div class="muted mt-2">${count===3 ? '🎉 أحسنت! أكملت مزامير اليوم' : (streak ? `🔥 ${streak} ${streak===1?'يوم':'أيام'} متتالية — لا تقطع السلسلة` : 'ابدأ سلسلتك اليوم 🔥')} · اليوم ${(dn%50)+1} من ٥٠ في دورة المزامير</div>
+    </div>
+    ${PSALM_SLOTS.map(psalmCard).join('')}
+    <div class="card p-3 mb-3">
+      <b>🔔 تذكير بالمزامير</b>
+      <div class="muted mb-2">اختر مواعيدك. التذكير يعمل والتطبيق مفتوح أو في الخلفية.</div>
+      <div class="mb-3">${timeRow}</div>
+      ${perm==='denied' ? `<div class="muted" style="color:var(--bad);">الإشعارات محظورة من إعدادات المتصفح لهذا الموقع.</div>`
+        : `<button class="btn ${remindOn?'btn-outline':'btn-teal'} btn-sm" data-remind-toggle>${remindOn?'إيقاف التذكير':'تفعيل التذكير'}</button>`}
+      <hr style="border-color:var(--line);margin:16px 0;">
+      <b>📲 إشعارات حتى والتطبيق مغلق</b>
+      <div class="muted mb-2">${pushOn ? '✅ مفعّلة: ستصلك رسالة بمزمور كل وقت مع كلمة تشجيع.' : 'تصلك رسالة بمزمور الصباح والظهر والمساء مع كلمة تشجيع. على الآيفون: ثبّت التطبيق على الشاشة الرئيسية أولًا.'}</div>
+      ${pushOn ? `<button class="btn btn-outline btn-sm" data-push-toggle="off">إيقاف الإشعارات الفورية</button>` : `<button class="btn btn-gold btn-sm" data-push-toggle="on">تفعيل الإشعارات الفورية</button>`}
+    </div>
+  </div>`;
+}
+function bindTodayEvents(u){
+  document.querySelectorAll('[data-open-psalm]').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.dataset.openPsalm);
+      ui.openPsalm = (ui.openPsalm===i) ? null : i;
+      if(ui.openPsalm !== null){
+        const n = psalmForSlot(dayNumber(cairoParts()), i);
+        ui.psalmData = ui.psalmData || {}; ui.psalmErr = ui.psalmErr || {};
+        if(!ui.psalmData[n]){ delete ui.psalmErr[n]; loadPsalmText(n).then(v=>{ ui.psalmData[n] = v; render(); }).catch(e=>{ console.warn(e); ui.psalmErr[n] = true; render(); }); }
+      }
+      render();
+    };
+  });
+  document.querySelectorAll('[data-read-psalm]').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.dataset.readPsalm), dn = dayNumber(cairoParts()), dk = dateKeyOf(dn);
+      const was = !!(readLog(u)[dk] || [])[i]; setRead(u, dk, i, !was);
+      if(!was && (readLog(u)[dk]||[]).filter(Boolean).length===3) showToast('🎉 أحسنت! أكملت مزامير اليوم');
+      render();
+    };
+  });
+  document.querySelectorAll('[data-remind-time]').forEach(el=>{
+    el.addEventListener('change', ()=>{ const cfg = getRemind(); cfg.times[Number(el.dataset.remindTime)] = el.value || cfg.times[Number(el.dataset.remindTime)]; saveRemind(cfg); scheduleReminders(); showToast('تم حفظ المواعيد.'); });
+  });
+  document.querySelectorAll('[data-remind-toggle]').forEach(b=>{
+    b.onclick = async ()=>{
+      const cfg = getRemind();
+      if(cfg.on && Notification.permission==='granted'){ cfg.on = false; saveRemind(cfg); scheduleReminders(); showToast('تم إيقاف التذكير.'); render(); return; }
+      if(!notifSupported()){ showToast('متصفحك لا يدعم الإشعارات.'); return; }
+      const perm = await Notification.requestPermission();
+      if(perm !== 'granted'){ showToast('لم يتم السماح بالإشعارات.'); render(); return; }
+      cfg.on = true; saveRemind(cfg); scheduleReminders(); showToast('تم تفعيل التذكير ✓');
+      showLocalNotification('📖 مزامير اليوم', 'سنذكّرك في المواعيد التي اخترتها 🙏', 'psalm-welcome');
+      render();
+    };
+  });
+  document.querySelectorAll('[data-push-toggle]').forEach(b=>{ b.onclick = ()=>{ if(b.dataset.pushToggle==='on') enablePush(u); else disablePush(); }; });
 }
 
 /* ---------------- SETTINGS ---------------- */
@@ -2024,6 +2298,7 @@ function bindAppEvents(u){
   // MINISTRY sub nav
   document.querySelectorAll('[data-ministry]').forEach(b=>{ b.onclick = ()=>{ ui.ministrySub = b.dataset.ministry; render(); }; });
   bindExamEvents(u);
+  bindTodayEvents(u);
 
   // ATTENDANCE
   document.querySelectorAll('[data-cls]').forEach(b=>{ b.onclick = ()=>{ ui.adminAttClassroom = b.dataset.cls; render(); }; });

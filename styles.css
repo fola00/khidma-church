@@ -337,3 +337,11 @@
 .mt-1{margin-top:.25rem!important}.mt-2{margin-top:.5rem!important}
 .p-3{padding:1rem!important}.px-3{padding-left:1rem!important;padding-right:1rem!important}.py-2{padding-top:.5rem!important;padding-bottom:.5rem!important}
 .text-center{text-align:center!important}.rounded-pill{border-radius:50rem!important}
+
+/* ---------- Today tab: psalms, progress, encouragement ---------- */
+.today-progress{height:10px;border-radius:99px;background:var(--parchment-2);overflow:hidden;}
+.today-progress > span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--gold-light));transition:width .3s ease;}
+.psalm-text{margin:12px 0;padding:12px 14px;border-radius:12px;background:var(--parchment);border:1px solid var(--line);max-height:60vh;overflow-y:auto;}
+.psalm-text p{margin:0 0 10px;font-size:16.5px;line-height:2;color:var(--text);}
+.psalm-text .vn{display:inline-block;min-width:22px;margin-inline-end:6px;font-size:12px;font-weight:800;color:var(--text-soft);}
+input[type="time"].form-control{text-align:center;}
